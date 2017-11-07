@@ -1,0 +1,15 @@
+{
+  "batch_size":32,
+  "LSTM_dim":512,
+  "embedding_size":512,
+  "nb_LSTM_cells":30,
+  "epochs":100,
+  "VGG_finetuning":true,
+  "vocab_size":10000,
+  "dropout_rate":0.5,
+  "grad_clip":5,
+  "batch_norm":true,
+  "im_width":128,
+  "im_height":128
+
+}
