@@ -6,6 +6,11 @@ import numpy as np
 from keras.preprocessing.sequence import pad_sequences
 from collections import Counter
 import pickle
+import skimage
+import skimage.io
+import skimage.transform
+import random
+import json
 
 class Batcher():
 
@@ -15,8 +20,7 @@ class Batcher():
         during training, containing both images and annotations. It will also count down the iterations and epochs that has been made
         """
 
-        self.images_path = os.path.join(data_path, 'images')
-        self.annotations_path = os.path.join(data_path, 'annotations')
+        self.train_path = os.path.join(data_path, 'train/')
 
         self.batch_size = config['batch_size']
         self.im_width = config['im_width']
@@ -24,25 +28,57 @@ class Batcher():
         self.max_len = config['nb_LSTM_cells']
         self.vocab = vocab
         self.epoch_completed = 0
+        
+    def load_annotations(self):
+        annot = json.load(open(self.train_path+'annotations/captions_train2014.json', 'r'))
+        available_im = os.listdir(self.train_path+'images/')
+        self.ids = [elem['id'] for elem in annot['images'] if elem['file_name'] in available_im]
+        captions_list = [elem for elem in annot['annotations'] if elem['image_id'] in self.ids]
+        self.captions = pd.DataFrame(captions_list).groupby('image_id')['caption'].apply(list)
 
-    def resize(self, image):
-        """
-        :param image: image to be resized
-        :return: resized image at the dimension self.im_width, self.im_height
-        """
-
-        return resized_image
+    
+    def load_image(self, path):
+        # load image
+        img = skimage.io.imread(path)
+        img = img / 255.0
+        assert (0 <= img).all() and (img <= 1.0).all()
+        # print "Original Image Shape: ", img.shape
+        # we crop image from center
+        short_edge = min(img.shape[:2])
+        yy = int((img.shape[0] - short_edge) / 2)
+        xx = int((img.shape[1] - short_edge) / 2)
+        crop_img = img[yy: yy + short_edge, xx: xx + short_edge]
+        # resize to 224, 224
+        resized_img = skimage.transform.resize(crop_img, (self.im_width, self.im_height))
+        return resized_img
 
     def next_batch(self):
         """
         :return: a batch containing images and their encoded annotations, picked in the paths folder. Deals with
         the number of completed epochs
         """
-
-        return images, annotations
-
+        
+        random.shuffle(self.ids)
+        batch_ids = self.ids[:4]
+        imgs = np.zeros((self.batch_size, self.im_width, self.im_height, 3), dtype=np.float)
+        labels = np.zeros((self.batch_size, 1), dtype=np.float)
+        
+        
+        for image_id in batch_ids:
+            idx = image_id % self.batch_size
+            img_name = 'COCO_train2014_000000' + str(image_id) + '.jpg'
+            imgs[idx,...] = self.load_image(self.train_path + 'images/' + img_name)
+            labels[idx,...] = self.make_labels(self.captions[image_id])
+            
+            if idx == self.batch_size - 1:
+                yield imgs, labels
+        
+    
+    def make_labels(self, captions_list):
+        return 1
+    
     @staticmethod
-    def clean_sentence(sentence):
+    def clean_sentence(sentences):
         # This method has been put as static as we might need it for other purposes outside the particular instance
         # of the class
         """
