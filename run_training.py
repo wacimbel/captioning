@@ -26,6 +26,7 @@ def setup_training(train_dir):
     return summary_writer
 
 if __name__ == "__main__":
+
     config = json.load('config.json')
     model = CaptioningNetwork(config)
     data_path = 'coco/'
@@ -37,6 +38,15 @@ if __name__ == "__main__":
 
     # Setup training
     sess = tf.Session()
+
+    # Feed forward test
+    with sess:
+        sess.run(...)
+        output_shape = ...
+        print('Feed forward OK! Output shape: %s' % str(output_shape))
+
+
+    # Training - to comment while testing the feed forward pass
     with sess:
         summary_writer = setup_training(train_dir)
 
