@@ -53,39 +53,18 @@ class CaptioningNetwork():
         :return: Creates model (final variable from feed_dict). The output is to define the self.out_tensor
         object, which is the final prediction tensor used in the loss function
         """
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        self.out_tensor = ...
-
-    def calculate_loss(self, preds, y_out_pl):
-        """
         rand_unif_init = tf.random_uniform_initializer(-hps.rand_unif_init_mag, hps.rand_unif_init_mag, seed=123)
-        
+
         lstmcell = tf.contrib.rnn.LSTMCell(self.hyps.LSTM_dim, initializer=rand_unif_init)
         _, dec_state = tf.nn.dynamic_rnn(cell=lstmcell, inputs=enc_inputs, sequence_length=X_len, dtype=tf.float32)
 
         W_out = tf.get_variable('W_out', [self.hyps.LSTM_dim, self.hyps.vocab_size])
         b_out = tf.get_variable('b_out', [self.hyps.vocab_size])
-        
-        self.out_tensor =
-            
 
+        self.out_tensor =
+
+    def calculate_loss(self, preds, y_out_pl):
+        """
         :param preds: Prediction of the forward pass, as vocabulary distributions. Shape (batch_size, max_sentence_length, vocab_size)
         :param y_out_pl: True target. Shape (batch_size, sentence_length)
         :return: Likelihood of the prediction (defined in the paper). The loss is an element of the graph (Tensor)
