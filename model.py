@@ -17,8 +17,8 @@ class CaptioningNetwork():
         :return: Creates all the necessary placeholders for the training loop, as class variables
         """
         self.X_pl = tf.placeholder(tf.float32, shape=[self.hyps['batch_size'], self.hyps['im_height'], self.hyps['im_width']], name='X_input')
-        self.y_in_pl = tf.placeholder(tf.int32, shape=[self.hyps['batch_size'], self.hyps['vocab_size']], name='y_target_in')
-        self.y_out_pl = tf.placeholder(tf.int32, shape=[self.hyps['batch_size'], self.hyps['vocab_size']], name='y_target_out')
+        self.y_in_pl = tf.placeholder(tf.int32, shape=[self.hyps['batch_size'], self.hyps['vocab_size']], name='y_target')
+        self.y_out_pl = tf.placeholder(tf.int32, shape=[self.hyps['batch_size'], self.hyps['vocab_size']], name='y_target')
 
     def make_feed_dict(self, batch: Tuple) -> Dict:
         """
@@ -38,91 +38,61 @@ class CaptioningNetwork():
         """
         :return: Creates, or returns, the graph corresponding to the model.
         """
-        # Creating placeholders
-        self.create_placeholders()
         # Creating model
         self.add_model()
-        # Creating the training operators (loss/optimizers etc)
-        self.global_step = tf.Variable(0, trainable=False, name='global_step')
-        self.add_train_op()
-        self.summaries = tf.summary.merge_all()
 
-    def add_train_op(self):
+        # Creating the training operators (loss/optimizers etc)
+        self.add_train_op()
+
+    def loss_and_metric(self, preds: tf.Tensor):
         """
         Assigns to a class variable the training operator (gradient iteration)
         """
 
-        self.loss = self.calculate_loss(self.out_tensor, self.y_out_pl)
+        loss = self.calculate_loss(self.y_out_pl, preds)
         optimizer = tf.train.GradientDescentOptimizer(self.hyps['learning_rate'])
-        grads_and_vars = optimizer.compute_gradients(self.loss)
-        self.train_op = optimizer.apply_gradients(grads_and_vars, global_step=self.global_step)
+        self.train_op = optimizer.apply_gradients(loss)
 
-    def add_model(self, enc_inputs, X_len):
+    def add_model(self, CNN_lastlayer, caption_embedding):
         """
-        :return: Creates model (final variable from feed_dict). The output is to define the self.out_tensor
-        object, which is the final prediction tensor used in the loss function
-        """
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        self.out_tensor = ...
-
-    def calculate_loss(self, preds, y_out_pl):
+        :return: Creates model (final variable from feed_dict)
         """
         rand_unif_init = tf.random_uniform_initializer(-hps.rand_unif_init_mag, hps.rand_unif_init_mag, seed=123)
         
+        # CNN_lastlayer : [batch_size, LSTM_dim]
+        # caption_embedding : [batch_size, nb_LSTM_cells, embedding_size] where embedding_size = LSTM_dim
         lstmcell = tf.contrib.rnn.LSTMCell(self.hyps.LSTM_dim, initializer=rand_unif_init)
-        _, dec_state = tf.nn.dynamic_rnn(cell=lstmcell, inputs=enc_inputs, sequence_length=X_len, dtype=tf.float32)
+        outputs, state = tf.nn.dynamic_rnn(cell=lstmcell, initial_state=CNN_lastlayer, inputs=caption_embedding, dtype=tf.float32)
+
+        # outputs : [batchsize, nombre de mots, LSTM_dim]
 
         W_out = tf.get_variable('W_out', [self.hyps.LSTM_dim, self.hyps.vocab_size])
         b_out = tf.get_variable('b_out', [self.hyps.vocab_size])
         
-        self.out_tensor =
+        out_tensor = []
+        for output_batch in outputs:
+            out_tensor.append(tf.matmul(output_batch, W_out) + b_out)
+        
+        vocab_dists = [tf.nn.softmax(s) for s in out_tensor]
+        
+        vocab_dists = tf.stack(vocab_dists)
+        self.out_tensor = vocab_dists
             
 
-        :param preds: Prediction of the forward pass
-        :param y_out_pl: True target
-        :return: Likelihood of the prediction (defined in the paper). The loss is an element of the graph (Tensor)
-        """
+    def calculate_loss(self, y_out_pl, preds):
         loss = 0
         for i, index in enumerate(y_out_pl):
             loss += -tf.log(tf.gather_nd(preds, (None, i, index)))
 
         return loss
 
-    def run_train_step(self, sess, batch: Tuple):
+    def run_train_step(self, batch: Tuple):
         """
-        :param sess: TensorFlow session
         :param batch: Batch of images and annotations
         :return: run with a TF session a batch iteration, defining feed dict, fetches, etc.
         """
 
-        feed_dict = self.make_feed_dict(batch)
-        fetches = {'loss': self.loss,
-                   'train_op': self.train_op,
-                   'summary': self.summaries,
-                   'global_step': self.global_step}
-
-        result = sess.run(fetches=fetches, feed_dict=feed_dict)
-
-        return result
-
-    def predict(self, input_image):
+    def predict(self, input):
         """
 
         :param input: image to feed-forward
@@ -131,9 +101,4 @@ class CaptioningNetwork():
 
         # Feed forward with the trained model
         generated_caption = ...
-        fetches = [self.out_tensor]
-        feed_dict = {self.X_pl: input_image}
-        with tf.Session() as sess:
-            generated_caption = sess.run(fetches, feed_dict)
-
         return generated_caption
