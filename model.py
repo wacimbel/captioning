@@ -53,10 +53,20 @@ class CaptioningNetwork():
         optimizer = tf.train.GradientDescentOptimizer(self.hyps['learning_rate'])
         self.train_op = optimizer.apply_gradients(loss)
 
-    def add_model(self):
+    def add_model(self, enc_inputs, X_len):
         """
         :return: Creates model (final variable from feed_dict)
         """
+        rand_unif_init = tf.random_uniform_initializer(-hps.rand_unif_init_mag, hps.rand_unif_init_mag, seed=123)
+        
+        lstmcell = tf.contrib.rnn.LSTMCell(self.hyps.LSTM_dim, initializer=rand_unif_init)
+        _, dec_state = tf.nn.dynamic_rnn(cell=lstmcell, inputs=enc_inputs, sequence_length=X_len, dtype=tf.float32)
+
+        W_out = tf.get_variable('W_out', [self.hyps.LSTM_dim, self.hyps.vocab_size])
+        b_out = tf.get_variable('b_out', [self.hyps.vocab_size])
+        
+        self.out_tensor =
+            
 
     def calculate_loss(self, y_out_pl, preds):
         loss = 0

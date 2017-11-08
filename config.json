@@ -12,4 +12,5 @@
   "im_width":128,
   "im_height":128
 
+  'rand_unif_init_mag':0.02
 }
