@@ -16,9 +16,9 @@ class CaptioningNetwork():
 
         :return: Creates all the necessary placeholders for the training loop, as class variables
         """
-        self.X_pl = tf.placeholder(tf.float32, shape=[self.hyps['batch_size'], self.hyps['im_height'], self.hyps['im_width']], name='X_input')
-        self.y_in_pl = tf.placeholder(tf.int32, shape=[self.hyps['batch_size'], self.hyps['vocab_size']], name='y_target_in')
-        self.y_out_pl = tf.placeholder(tf.int32, shape=[self.hyps['batch_size'], self.hyps['vocab_size']], name='y_target_out')
+        self.X_pl = tf.placeholder(tf.float32, shape=(self.hyps['batch_size'], self.hyps['im_width'], self.hyps['im_height'], self.hyps['nb_channels']), name='X_input')
+        self.y_in_pl = tf.placeholder(tf.int32, shape=(self.hyps['batch_size'], self.hyps['max_sentence_length']), name='y_target_in')
+        self.y_out_pl = tf.placeholder(tf.int32, shape=(self.hyps['batch_size'], self.hyps['max_sentence_length']), name='y_target_out')
 
     def make_feed_dict(self, batch: Tuple) -> Dict:
         """
@@ -47,15 +47,6 @@ class CaptioningNetwork():
         self.add_train_op()
         self.summaries = tf.summary.merge_all()
 
-    def add_train_op(self):
-        """
-        Assigns to a class variable the training operator (gradient iteration)
-        """
-
-        self.loss = self.calculate_loss(self.out_tensor, self.y_out_pl)
-        optimizer = tf.train.GradientDescentOptimizer(self.hyps['learning_rate'])
-        grads_and_vars = optimizer.compute_gradients(self.loss)
-        self.train_op = optimizer.apply_gradients(grads_and_vars, global_step=self.global_step)
 
     def add_model(self, enc_inputs, X_len):
         """
@@ -95,15 +86,31 @@ class CaptioningNetwork():
         self.out_tensor =
             
 
-        :param preds: Prediction of the forward pass
-        :param y_out_pl: True target
+        :param preds: Prediction of the forward pass, as vocabulary distributions. Shape (batch_size, max_sentence_length, vocab_size)
+        :param y_out_pl: True target. Shape (batch_size, sentence_length)
         :return: Likelihood of the prediction (defined in the paper). The loss is an element of the graph (Tensor)
         """
-        loss = 0
-        for i, index in enumerate(y_out_pl):
-            loss += -tf.log(tf.gather_nd(preds, (None, i, index)))
 
-        return loss
+        temp = tf.reshape(y_out_pl, (self.hyps['batch_size'], self.hyps['max_sentence_length'], 1))
+
+        unstacked_pred = tf.unstack(preds)
+        unstacked_true = tf.unstack(temp)
+
+        results = [tf.gather_nd(unstacked_pred[i],
+                                tf.concat([tf.reshape(tf.range(0, self.hyps['max_sentence_length']), (-1, 1)), unstacked_true[i]], axis=1)) for i in
+                   range(len(unstacked_pred))]
+        results = -tf.log(tf.stack(results))
+
+        return tf.reduce_sum(results)
+
+    def add_train_op(self):
+        """
+        Assigns to a class variable the training operator (gradient iteration)
+        """
+        self.loss = self.calculate_loss(self.out_tensor, self.y_out_pl)
+        optimizer = tf.train.GradientDescentOptimizer(self.hyps['learning_rate'])
+        grads_and_vars = optimizer.compute_gradients(self.loss)
+        self.train_op = optimizer.apply_gradients(grads_and_vars, global_step=self.global_step)
 
     def run_train_step(self, sess, batch: Tuple):
         """
