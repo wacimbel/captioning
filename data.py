@@ -7,6 +7,7 @@ from keras.preprocessing.sequence import pad_sequences
 from collections import Counter
 import pickle
 
+
 class Batcher():
 
     def __init__(self, data_path, config, vocab):
@@ -23,6 +24,7 @@ class Batcher():
         self.im_height = config['im_height']
         self.max_len = config['nb_LSTM_cells']
         self.vocab = vocab
+
         self.epoch_completed = 0
 
     def resize(self, image):
@@ -55,7 +57,6 @@ class Batcher():
 
     def encode_sentence(self, sentence, vocab):
         """
-
         :param sentence: Raw sentence to encode
         :param vocab: global vocab file.
         :return: Encoded sentence with IDs of the words, padded to a fixed size length.

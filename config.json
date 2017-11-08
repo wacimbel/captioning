@@ -1,4 +1,5 @@
 {
+
   "batch_size":32,
   "LSTM_dim":512,
   "embedding_size":512,
