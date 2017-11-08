@@ -11,7 +11,11 @@ from .data import Batcher, Vocab
 
 
 def setup_training(train_dir):
+    """
 
+    :param train_dir: Directory where the model and training checkpoints will be saved
+    :return: A summary writer object, configured and ready to be used in the training loop
+    """
     saver = tf.train.Saver(max_to_keep=3)  # keep 3 checkpoints at a time
     sv = tf.train.Supervisor(logdir=train_dir,
                              is_chief=True,

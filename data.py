@@ -43,7 +43,8 @@ class Batcher():
 
     @staticmethod
     def clean_sentence(sentence):
-
+        # This method has been put as static as we might need it for other purposes outside the particular instance
+        # of the class
         """
         :return: Cleans the sentence passed in argument
         """
@@ -56,17 +57,18 @@ class Batcher():
         """
 
         :param sentence: Raw sentence to encode
-        :param vocab: global vocab
-        :return:
+        :param vocab: global vocab file.
+        :return: Encoded sentence with IDs of the words, padded to a fixed size length.
         """
         ids = [vocab.get_word_index(word) for word in self.clean_sentence(sentence).split()]
 
         return pad_sequences(ids, maxlen=self.max_len)
 
+
 class Vocab():
     """
     This class aims at loading the french vocabulary, and implements a couple of convenient functions to deal with
-    the vocabulary for embeddings
+    the vocabulary for embeddings. We load a vocab file which structure is: {id_word: (word, word_count)}
     """
 
     def __init__(self, savepath):
