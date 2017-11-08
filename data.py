@@ -92,7 +92,7 @@ class Batcher():
         return 1
 
     @staticmethod
-    def clean_sentence(sentences):
+    def clean_sentence(sentence):
         # This method has been put as static as we might need it for other purposes outside the particular instance
         # of the class
         """
