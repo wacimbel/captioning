@@ -1,7 +1,7 @@
 {
 
   "batch_size":4,
-  "LSTM_dim":512,
+  "hidden_dim":512,
   "embedding_size":512,
   "max_sentence_length":30,
   "nb_channels":3,
@@ -13,6 +13,6 @@
   "batch_norm":true,
   "im_width":128,
   "im_height":128,
-  'rand_unif_init_mag':0.02,
-  'embedding_std':0.1
+  "rand_unif_init_mag":0.02,
+  "embedding_std":0.1
 }
