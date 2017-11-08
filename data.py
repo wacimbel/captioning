@@ -60,7 +60,9 @@ class Batcher():
     def next_batch(self):
         """
         :return: a batch containing images and their encoded annotations, picked in the paths folder. Deals with
-        the number of completed epochs
+        the number of completed epochs.
+        Images is of shape (batch_size, im_width, im_height)
+        Annotations is of shape (batch_size, max_length)
         """
         next_idx = self.current_idx+4
         batch_ids = self.ids[self.current_idx:next_idx]
@@ -75,7 +77,6 @@ class Batcher():
         imgs = np.zeros((self.batch_size, self.im_width, self.im_height, 3), dtype=np.float)
         labels = np.zeros((self.batch_size, 1), dtype=np.float)
         
-        
         for image_id in batch_ids:
             batch_idx = image_id % self.batch_size
             print(image_id)
@@ -89,7 +90,7 @@ class Batcher():
     
     def make_labels(self, captions_list):
         return 1
-    
+
     @staticmethod
     def clean_sentence(sentences):
         # This method has been put as static as we might need it for other purposes outside the particular instance
