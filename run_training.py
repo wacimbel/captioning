@@ -31,7 +31,7 @@ def setup_training(train_dir):
 
 if __name__ == "__main__":
 
-    config = json.load('config.json')
+    config = json.load(open('config.json', 'r'))
     model = CaptioningNetwork(config)
     data_path = 'coco/'
     train_dir = 'Caption_training' + datetime.datetime.strftime(datetime.datetime.today(), '%d%m%Y%H%M%S')
