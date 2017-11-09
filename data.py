@@ -12,6 +12,8 @@ import skimage.transform
 import random
 import json
 
+
+
 class Batcher():
 
     def __init__(self, data_path, config, vocab):
@@ -49,12 +51,13 @@ class Batcher():
         assert (0 <= img).all() and (img <= 1.0).all()
         # print "Original Image Shape: ", img.shape
         # we crop image from center
-        short_edge = min(img.shape[:2])
-        yy = int((img.shape[0] - short_edge) / 2)
-        xx = int((img.shape[1] - short_edge) / 2)
-        crop_img = img[yy: yy + short_edge, xx: xx + short_edge]
+        long_edge = max(img.shape[:2])
+        padded_img = np.zeros((long_edge, long_edge, 3))
+        yy = int((long_edge - img.shape[0]) / 2)
+        xx = int((long_edge - img.shape[1]) / 2)
+        padded_img[yy: yy + img.shape[0], xx: xx + img.shape[1]] = img
         # resize to 224, 224
-        resized_img = skimage.transform.resize(crop_img, (self.im_width, self.im_height))
+        resized_img = skimage.transform.resize(padded_img, (self.im_width, self.im_height))        
         return resized_img
 
     def next_batch(self):
@@ -77,9 +80,8 @@ class Batcher():
         imgs = np.zeros((self.batch_size, self.im_width, self.im_height, 3), dtype=np.float)
         labels = np.zeros((self.batch_size, 1), dtype=np.float)
         
-        for image_id in batch_ids:
-            batch_idx = image_id % self.batch_size
-            print(image_id)
+        for i, image_id in enumerate(batch_ids):
+            batch_idx = i % self.batch_size
             img_name = 'COCO_train2014_000000' + str(image_id) + '.jpg'
             imgs[batch_idx,...] = self.load_image(self.train_path + 'images/' + img_name)
             labels[batch_idx,...] = self.make_labels(self.captions[image_id])

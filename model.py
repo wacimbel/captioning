@@ -2,6 +2,7 @@
 import tensorflow as tf
 from typing import Dict, List, Tuple
 import numpy as np
+import tensornets.tensornets as nets
 
 class CaptioningNetwork():
     def __init__(self, config):
@@ -56,12 +57,13 @@ class CaptioningNetwork():
         self.add_train_op()
         self.summaries = tf.summary.merge_all()
 
-    def add_model(self):
+    def add_model(self, rgb):
         """
         :return: Creates model (final variable from feed_dict). The output is to define the self.out_tensor
         object, which is the final prediction tensor used in the loss function
         """
-
+        #We have to remember loading the weights for this layer
+        #CNN_lastlayer = nets.Inception3(rgb)
         CNN_lastlayer = tf.Variable(np.random.rand(self.hyps['batch_size'], self.hyps['hidden_dim']))
 
         # self.y_pl has shape (batch_size, max_sentence_length)

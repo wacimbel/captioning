@@ -11,8 +11,9 @@
   "dropout_rate":0.5,
   "grad_clip":5,
   "batch_norm":true,
-  "im_width":128,
-  "im_height":128,
+  "im_width":368,
+  "im_height":368,
   "rand_unif_init_mag":0.02,
-  "embedding_std":0.1
+  "embedding_std":0.1,
+  "nb_LSTM_cells": 30
 }
