@@ -122,7 +122,7 @@ class Batcher():
             batch_idx = i % self.batch_size
             img_name = 'COCO_val2014_000000' + str(image_id) + '.jpg'
             imgs[batch_idx, ...] = self.load_image(self.val_path + 'images/' + img_name)
-            if model:
+            if model is not None:
                 imgs[batch_idx, ...] = nets.preprocess(model, imgs[batch_idx, ...])    
             sentences = self.val_captions[image_id]
             labels.append(sentences)
