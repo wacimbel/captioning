@@ -40,8 +40,7 @@ class Batcher():
         available_im = os.listdir(self.train_path+'images/')
         self.train_ids = [elem['id'] for elem in annot['images'] if elem['file_name'] in available_im]
         
-        self.nb_ids = len(self.ids)
-        #random.shuffle(self.ids)
+        self.nb_ids = len(self.train_ids)
         
         captions_list = [elem for elem in annot['annotations'] if elem['image_id'] in self.train_ids]
         #self.captions = pd.DataFrame(captions_list).groupby('image_id')['caption'].apply(list)
@@ -57,7 +56,7 @@ class Batcher():
         
         captions_list = [elem for elem in annot['annotations'] if elem['image_id'] in self.val_ids]
         #self.captions = pd.DataFrame(captions_list).groupby('image_id')['caption'].apply(list)
-        self.test_captions = pd.DataFrame(captions_list).set_index('image_id')
+        self.val_captions = pd.DataFrame(captions_list).groupby('image_id')['caption'].apply(list)
     
     def load_image(self, path):
         # load image
@@ -87,7 +86,7 @@ class Batcher():
         
         if next_idx > self.nb_ids:
             self.epoch_completed +=1
-            random.shuffle(self.ids)
+            random.shuffle(self.train_ids)
             remaining = next_idx - self.nb_ids
             batch_ids += self.train_ids[:remaining]
             next_idx = remaining
@@ -110,6 +109,10 @@ class Batcher():
         
         
     def next_val_batch(self, model):
+        
+        random.shuffle(self.val_ids)
+        batch_ids = self.val_ids[:self.batch_size]
+        
         imgs = np.zeros((self.batch_size, self.im_width, self.im_height, 3), dtype=np.float)
         labels = []
         
