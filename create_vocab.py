@@ -19,8 +19,18 @@ for caption in raw_captions:
     counter.update(caption.lower().split())
 
 # Filtering on frequent-enough words
+pad_token = '<PAD>'
+unknown_token = '<UNK>'
+go_token = '<GO>'
+eos_token = '<EOS>'
+
 frequency_boundary = 5
-vocab = [i[0] for i in counter.most_common(100000000) if i[1] >= frequency_boundary]
+vocab = [i for i in counter.most_common(100000000) if i[1] >= frequency_boundary]
+vocab = {i+4: j for i, j in enumerate(vocab)}
+vocab[0] = (pad_token, 0)
+vocab[1] = (unknown_token, 0)
+vocab[2] = (go_token, 0)
+vocab[3] = (eos_token, 0)
 
 # Saving the vocab file in the current folder
 filename = 'vocab'
