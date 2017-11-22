@@ -41,7 +41,8 @@ class Batcher():
         #random.shuffle(self.ids)
         
         captions_list = [elem for elem in annot['annotations'] if elem['image_id'] in self.ids]
-        self.captions = pd.DataFrame(captions_list).groupby('image_id')['caption'].apply(list)
+        #self.captions = pd.DataFrame(captions_list).groupby('image_id')['caption'].apply(list)
+        self.captions = pd.DataFrame(captions_list).set_index('image_id')
 
     
     def load_image(self, path):
@@ -78,20 +79,18 @@ class Batcher():
             next_idx = remaining
             
         imgs = np.zeros((self.batch_size, self.im_width, self.im_height, 3), dtype=np.float)
-        labels = np.zeros((self.batch_size, 1), dtype=np.float)
+        labels = np.zeros((self.batch_size, self.max_len), dtype=np.int)
         
         for i, image_id in enumerate(batch_ids):
             batch_idx = i % self.batch_size
             img_name = 'COCO_train2014_000000' + str(image_id) + '.jpg'
             imgs[batch_idx,...] = self.load_image(self.train_path + 'images/' + img_name)
-            labels[batch_idx,...] = self.make_labels(self.captions[image_id])
+            sentence = self.captions.loc[image_id].sample(1)['caption'].values[0]
+            labels[batch_idx,...] = self.encode_sentence(sentence, self.vocab)
         
         self.current_idx = next_idx
         return imgs, labels
         
-    
-    def make_labels(self, captions_list):
-        return 1
 
     @staticmethod
     def clean_sentence(sentence):
@@ -113,8 +112,9 @@ class Batcher():
         :return: Encoded sentence with IDs of the words, padded to a fixed size length.
         """
         ids = [vocab.get_word_index(word) for word in self.clean_sentence(sentence).split()]
+        ids = vocab.add_start_end(ids)
 
-        return pad_sequences(ids, maxlen=self.max_len)
+        return pad_sequences([ids], maxlen=self.max_len, padding='post', truncating='post')
 
 
 class Vocab():
@@ -139,10 +139,13 @@ class Vocab():
         return self.vocab[self.word_to_index[word]][1]
 
     def get_word_index(self, word):
-        return self.word_to_index[word]
+        return self.word_to_index.get(word, 1)
 
     def get_index_count(self, index):
         return self.index_to_counts[index]
 
     def get_index_word(self, index):
         return self.index_to_word[index]
+    
+    def add_start_end(self, ids):
+        return [2] + ids + [3]
