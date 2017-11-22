@@ -74,7 +74,7 @@ class Batcher():
         resized_img = skimage.transform.resize(padded_img, (self.im_width, self.im_height))        
         return resized_img
 
-    def next_train_batch(self, model):
+    def next_train_batch(self, model=None):
         """
         :return: a batch containing images and their encoded annotations, picked in the paths folder. Deals with
         the number of completed epochs.
@@ -98,11 +98,11 @@ class Batcher():
             batch_idx = i % self.batch_size
             img_name = 'COCO_train2014_000000' + str(image_id) + '.jpg'
             imgs[batch_idx, ...] = self.load_image(self.train_path + 'images/' + img_name)
-            if model:
+            if model is not None:
                 imgs[batch_idx, ...] = nets.preprocess(model, imgs[batch_idx, ...])
             #sentence = self.train_captions.loc[image_id].sample(1)['caption'].values[0]
             #TEMP we select necessarily the same caption
-            sentence = self.train_captions.loc[image_id].iloc[0]['caption'].values[0]
+            sentence = self.train_captions.loc[image_id].iloc[0]['caption']
             labels[batch_idx, ...] = self.encode_sentence(sentence, self.vocab)
         
         self.current_idx = next_idx

@@ -81,7 +81,7 @@ if __name__ == "__main__":
         # while batcher.epoch_completed < config.epochs:
             i += 1
             print('Iteration %d' % i)
-            batch = batcher.next_batch(model.cnn)
+            batch = batcher.next_train_batch(model.cnn)
             tf.logging.info('running training step...')
             t0 = time.time()
             iteration = model.run_train_step(sess, batch)
@@ -97,7 +97,7 @@ if __name__ == "__main__":
 
             if not i % 10:
                 print('Validate\n\n')
-                valid_batch = batcher.next_batch(model.cnn)
+                valid_batch = batcher.next_val_batch(model.cnn)
                 inferred = model.run_valid_step(sess, valid_batch)
                 words = np.array([list(i) for i in inferred['inference']])
                 sentences = np.transpose(words)
@@ -110,4 +110,4 @@ if __name__ == "__main__":
                 print('\n----- True captions ------')
 
                 for id, k in enumerate(valid_batch[1]):
-                    print(id, ' '.join([vocab.get_index_word(j) for j in k]))
+                    print(id, ' '.join(k[0]))
