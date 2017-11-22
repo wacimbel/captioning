@@ -130,7 +130,10 @@ class CaptioningNetwork():
                    range(len(unstacked_pred))]
         results = -tf.log(tf.stack(results))
 
-        return tf.reduce_sum(results)
+        loss = tf.reduce_sum(results)
+        tf.summary.scalar('loss', loss)
+
+        return loss
 
     def add_train_op(self):
         """
