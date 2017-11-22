@@ -64,15 +64,19 @@ class CaptioningNetwork():
         """
         #We have to remember loading the weights for this layer
         CNN_lastlayer = nets.Inception3(self.X_pl)
+        # Shape sortie: [batchsize, 1000]
 
-        W_transition = tf.get_variable('W_out', [CNN_lastlayer.shape[1], self.hyps['hidden_dim']])
-        b_transition = tf.get_variable('b_out', [self.hyps['hidden_dim']])
+        W_transition = tf.get_variable('W_transition', [CNN_lastlayer.shape[1], self.hyps['hidden_dim']])
+        b_transition = tf.get_variable('b_transition', [self.hyps['hidden_dim']])
 
-        rnn_input = tf.nn.xw_plus_b(CNN_lastlayer, W_transition, b_transition, name='rnn_input')
+        # rnn_input has shape [batch_size, hidden_size]
+        cnn_output = tf.nn.xw_plus_b(CNN_lastlayer, W_transition, b_transition, name='rnn_input')
+        cnn_output = tf.expand_dims(cnn_output, axis=1)
 
         # self.y_pl has shape (batch_size, max_sentence_length)
         # caption_embedding has shape (batch_size, max_sentence_length, embedding_size)
         caption_embedding = self.embedding(self.y_pl)
+        inputs = tf.concat([cnn_output, caption_embedding], axis=1)
 
         rand_unif_init = tf.random_uniform_initializer(-self.hyps['rand_unif_init_mag'], self.hyps['rand_unif_init_mag'],
                                                        seed=123)
@@ -80,24 +84,27 @@ class CaptioningNetwork():
         # caption_embedding : [batch_size, nb_LSTM_cells, embedding_size] where embedding_size = hidden_dim
 
 
-        lstmcell = tf.contrib.rnn.LSTMCell(self.hyps['max_sentence_length'], initializer=rand_unif_init)
-        outputs, state = tf.nn.dynamic_rnn(cell=lstmcell, initial_state=rnn_input, inputs=caption_embedding, dtype=tf.float32)
+        lstmcell = tf.contrib.rnn.LSTMCell(self.hyps['hidden_dim'], initializer=rand_unif_init)
+        outputs, state = tf.nn.dynamic_rnn(cell=lstmcell,  inputs=inputs, dtype=tf.float32)
 
         print(outputs)
-        outputs = [tf.Variable(np.random.rand()) for i in range(self.hyps[])]
         # outputs : [batchsize, nombre de mots, hidden_dim]
 
         W_out = tf.get_variable('W_out', [self.hyps['hidden_dim'], self.hyps['vocab_size']])
         b_out = tf.get_variable('b_out', [self.hyps['vocab_size']])
-        
+
         out_tensor = []
-        for output_batch in outputs:
+        unstacked_outputs = tf.unstack(outputs, axis=1)
+
+        for output_batch in unstacked_outputs[1:]:
             out_tensor.append(tf.matmul(output_batch, W_out) + b_out)
-        
+
+        # stacked_out_tensor = tf.stack(out_tensor, axis=1)
         vocab_dists = [tf.nn.softmax(s) for s in out_tensor]
-        
-        vocab_dists = tf.stack(vocab_dists)
-        self.out_tensor = vocab_dists
+
+        stacked_vocab_dists = tf.stack(vocab_dists, axis=1)
+        self.out_tensor = stacked_vocab_dists
+
             
     def calculate_loss(self, preds, y_pl):
         """
