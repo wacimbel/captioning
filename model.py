@@ -35,11 +35,6 @@ class CaptioningNetwork():
         return feed_dict
 
     def embedding(self, annotations):
-
-        self.X_embeddings = tf.get_variable('X_embeddings', shape=[self.hyps['vocab_size'], self.hyps['embedding_size']],
-                                            dtype = tf.float32,
-                                            initializer=tf.random_normal_initializer(stddev=self.hyps['embedding_sdv']))
-
         return tf.nn.embedding_lookup(self.X_embeddings, annotations)
 
     def build_graph(self):
@@ -54,7 +49,6 @@ class CaptioningNetwork():
 
     def add_operators(self):
         # Creating the training operators (loss/optimizers etc)
-        self.global_step = tf.Variable(0, dtype='int32', trainable=False, name='global_step')
         self.add_train_op()
         self.summaries = tf.summary.merge_all()
 
@@ -64,6 +58,11 @@ class CaptioningNetwork():
         object, which is the final prediction tensor used in the loss function
         """
         #We have to remember loading the weights for this layer
+
+        self.X_embeddings = tf.get_variable('X_embeddings',
+                                            shape=[self.hyps['vocab_size'], self.hyps['embedding_size']],
+                                            dtype=tf.float32,
+                                            initializer=tf.random_normal_initializer(stddev=self.hyps['embedding_sdv']))
 
         self.cnn = nets.Inception3(self.X_pl)
 
@@ -87,7 +86,6 @@ class CaptioningNetwork():
         lstmcell = tf.contrib.rnn.LSTMCell(self.hyps['hidden_dim'], initializer=xav_init)
         outputs, state = tf.nn.dynamic_rnn(cell=lstmcell,  inputs=inputs, dtype=tf.float32)
 
-        print(outputs)
         # outputs : [batchsize, nombre de mots, hidden_dim]
 
 
@@ -100,17 +98,38 @@ class CaptioningNetwork():
         for output_batch in unstacked_outputs[1:]:
             out_tensor.append(tf.nn.xw_plus_b(output_batch, W_out, b_out))
 
-        # for i, output_batch in enumerate(unstacked_outputs[1:]):
-        #     if i == 0:
-        #         out_tensor.append(tf.contrib.layers.fully_connected(unstacked_outputs[1], self.hyps['vocab_size'],
-        #                                                             scope='vocab_distrib'))
-        #     else:
-        #         out_tensor.append(tf.contrib.layers.fully_connected(output_batch, self.hyps['vocab_size'], scope='vocab_distrib', reuse=True))
-
         vocab_dists = [tf.nn.softmax(s) for s in out_tensor]
 
         stacked_vocab_dists = tf.stack(vocab_dists, axis=1)
         self.out_tensor = stacked_vocab_dists
+
+
+
+        # Inference part of the graph
+        input = cnn_output
+        inferred = []
+
+        output, state = tf.nn.dynamic_rnn(cell=lstmcell, inputs=input, dtype=tf.float32)
+
+        # Input the token <GO>
+        input = self.embedding(2)
+        input = tf.stack([input for i in range(cnn_output.get_shape()[0])])
+        input = tf.expand_dims(input, axis=1)
+
+        for steps in range(self.hyps['max_sentence_length']):
+
+            output, state = tf.nn.dynamic_rnn(cell=lstmcell, inputs=input, initial_state=state)
+
+            distrib = tf.nn.xw_plus_b(tf.unstack(output, axis=1)[0], W_out, b_out)
+            distrib = tf.nn.softmax(distrib)
+            index = tf.argmax(distrib, axis=1)
+            inferred.append(index)
+            input = self.embedding(index)
+            input = tf.expand_dims(input, axis=1)
+
+        self.inferred_tensor = inferred
+
+
 
             
     def calculate_loss(self, preds, y_pl):
@@ -140,8 +159,9 @@ class CaptioningNetwork():
         Assigns to a class variable the training operator (gradient iteration)
         """
         self.loss = self.calculate_loss(self.out_tensor, self.y_pl)
-        optimizer = tf.train.GradientDescentOptimizer(self.hyps['learning_rate'])
+        optimizer = tf.train.AdamOptimizer()
         grads_and_vars = optimizer.compute_gradients(self.loss)
+        self.global_step = tf.Variable(0, trainable=False, name='global_step')
         self.train_op = optimizer.apply_gradients(grads_and_vars, global_step=self.global_step)
 
     def feed_forward_test(self, sess, batch):
@@ -159,7 +179,6 @@ class CaptioningNetwork():
         """
 
         feed_dict = self.make_feed_dict(batch)
-        print(self.global_step)
         fetches = {'loss': self.loss,
                    'train_op': self.train_op,
                    'summary': self.summaries,
@@ -168,8 +187,18 @@ class CaptioningNetwork():
 
         result = sess.run(fetches=fetches, feed_dict=feed_dict)
 
+
         return result
 
+    def run_valid_step(self, sess, valid_batch):
+        feed_dict = self.make_feed_dict(valid_batch)
+        fetches = {'inference': self.inferred_tensor,
+                   'summary': self.summaries
+                   }
+
+        result = sess.run(fetches=fetches, feed_dict=feed_dict)
+
+        return result
     def predict(self, input):
         """
 
