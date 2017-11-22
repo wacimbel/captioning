@@ -11,6 +11,7 @@ import skimage.io
 import skimage.transform
 import random
 import json
+import tensornets as nets
 
 
 
@@ -31,7 +32,8 @@ class Batcher():
         self.vocab = vocab
         self.current_idx = 0
         self.epoch_completed = 0
-        
+        self.load_annotations()
+
     def load_annotations(self):
         annot = json.load(open(self.train_path+'annotations/captions_train2014.json', 'r'))
         available_im = os.listdir(self.train_path+'images/')
@@ -61,7 +63,7 @@ class Batcher():
         resized_img = skimage.transform.resize(padded_img, (self.im_width, self.im_height))        
         return resized_img
 
-    def next_batch(self):
+    def next_batch(self, model):
         """
         :return: a batch containing images and their encoded annotations, picked in the paths folder. Deals with
         the number of completed epochs.
@@ -84,11 +86,13 @@ class Batcher():
         for i, image_id in enumerate(batch_ids):
             batch_idx = i % self.batch_size
             img_name = 'COCO_train2014_000000' + str(image_id) + '.jpg'
-            imgs[batch_idx,...] = self.load_image(self.train_path + 'images/' + img_name)
+            raw_img = self.load_image(self.train_path + 'images/' + img_name)
+            imgs[batch_idx, ...] = nets.preprocess(model, raw_img)
             sentence = self.captions.loc[image_id].sample(1)['caption'].values[0]
-            labels[batch_idx,...] = self.encode_sentence(sentence, self.vocab)
+            labels[batch_idx, ...] = self.encode_sentence(sentence, self.vocab)
         
         self.current_idx = next_idx
+
         return imgs, labels
         
 

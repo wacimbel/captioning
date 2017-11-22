@@ -6,7 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import datetime
 import time
-
+import tensornets as nets
 from model import CaptioningNetwork
 from data import Batcher, Vocab
 
@@ -57,26 +57,35 @@ if __name__ == "__main__":
 
     ### Temporary test with one iteration
     # Training - to comment while testing the feed forward pass
+
+
     with sess:
+
+        sess.run(tf.global_variables_initializer())
+
+        nets.pretrained(model.cnn)
+        model.add_operators()
+
         summary_writer = setup_training(train_dir)
+        print('Ready to feedforward')
+
 
         # Run training
         tf.logging.info('Starting training...')
-        i=0
-        while i<1:
+
+        model.feed_forward_test(sess, batcher.next_batch(model.cnn))
         # while batcher.epoch_completed < config.epochs:
-            i += 1
-            batch = batcher.next_batch()
-
-            tf.logging.info('running training step...')
-            t0 = time.time()
-            iteration = model.run_train_step(sess, batch)
-            t1 = time.time()
-            tf.logging.info('seconds for training step: %.3f', t1 - t0)
-
-            loss = iteration['loss']
-            tf.logging.info('Loss: %5.3f' % loss)
-
-            summaries = iteration['summary']
-
-            summary_writer.add_summary(summaries, iteration['global_step'])  # write the summaries
+        #     batch = batcher.next_batch()
+        #
+        #     tf.logging.info('running training step...')
+        #     t0 = time.time()
+        #     iteration = model.run_train_step(sess, batch)
+        #     t1 = time.time()
+        #     tf.logging.info('seconds for training step: %.3f', t1 - t0)
+        #
+        #     loss = iteration['loss']
+        #     tf.logging.info('Loss: %5.3f' % loss)
+        #
+        #     summaries = iteration['summary']
+        #
+        #     summary_writer.add_summary(summaries, iteration['global_step'])  # write the summaries

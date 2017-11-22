@@ -52,6 +52,7 @@ class CaptioningNetwork():
         # Creating model
         self.add_model()
 
+    def add_operators(self):
         # Creating the training operators (loss/optimizers etc)
         self.global_step = tf.Variable(0, trainable=False, name='global_step')
         self.add_train_op()
@@ -63,14 +64,14 @@ class CaptioningNetwork():
         object, which is the final prediction tensor used in the loss function
         """
         #We have to remember loading the weights for this layer
-        CNN_lastlayer = nets.Inception3(self.X_pl)
+
+        self.cnn = nets.Inception3(self.X_pl)
+
+        CNN_lastlayer = self.cnn
         # Shape sortie: [batchsize, 1000]
 
-        W_transition = tf.get_variable('W_transition', [CNN_lastlayer.shape[1], self.hyps['hidden_dim']])
-        b_transition = tf.get_variable('b_transition', [self.hyps['hidden_dim']])
-
+        cnn_output = tf.contrib.layers.fully_connected(CNN_lastlayer, self.hyps['hidden_dim'], scope='cnn_output')
         # rnn_input has shape [batch_size, hidden_size]
-        cnn_output = tf.nn.xw_plus_b(CNN_lastlayer, W_transition, b_transition, name='rnn_input')
         cnn_output = tf.expand_dims(cnn_output, axis=1)
 
         # self.y_pl has shape (batch_size, max_sentence_length)
@@ -78,28 +79,34 @@ class CaptioningNetwork():
         caption_embedding = self.embedding(self.y_pl)
         inputs = tf.concat([cnn_output, caption_embedding], axis=1)
 
-        rand_unif_init = tf.random_uniform_initializer(-self.hyps['rand_unif_init_mag'], self.hyps['rand_unif_init_mag'],
-                                                       seed=123)
+        xav_init = tf.contrib.layers.xavier_initializer(uniform=False)
         # CNN_lastlayer : [batch_size, hidden_dim]
         # caption_embedding : [batch_size, nb_LSTM_cells, embedding_size] where embedding_size = hidden_dim
 
 
-        lstmcell = tf.contrib.rnn.LSTMCell(self.hyps['hidden_dim'], initializer=rand_unif_init)
+        lstmcell = tf.contrib.rnn.LSTMCell(self.hyps['hidden_dim'], initializer=xav_init)
         outputs, state = tf.nn.dynamic_rnn(cell=lstmcell,  inputs=inputs, dtype=tf.float32)
 
         print(outputs)
         # outputs : [batchsize, nombre de mots, hidden_dim]
 
-        W_out = tf.get_variable('W_out', [self.hyps['hidden_dim'], self.hyps['vocab_size']])
-        b_out = tf.get_variable('b_out', [self.hyps['vocab_size']])
 
         out_tensor = []
         unstacked_outputs = tf.unstack(outputs, axis=1)
 
-        for output_batch in unstacked_outputs[1:]:
-            out_tensor.append(tf.matmul(output_batch, W_out) + b_out)
+        W_out = tf.get_variable('W_out', [self.hyps['hidden_dim'], self.hyps['vocab_size']], initializer=xav_init)
+        b_out = tf.get_variable('b_out', [self.hyps['vocab_size']])
 
-        # stacked_out_tensor = tf.stack(out_tensor, axis=1)
+        for output_batch in unstacked_outputs[1:]:
+            out_tensor.append(tf.nn.xw_plus_b(output_batch, W_out, b_out))
+
+        # for i, output_batch in enumerate(unstacked_outputs[1:]):
+        #     if i == 0:
+        #         out_tensor.append(tf.contrib.layers.fully_connected(unstacked_outputs[1], self.hyps['vocab_size'],
+        #                                                             scope='vocab_distrib'))
+        #     else:
+        #         out_tensor.append(tf.contrib.layers.fully_connected(output_batch, self.hyps['vocab_size'], scope='vocab_distrib', reuse=True))
+
         vocab_dists = [tf.nn.softmax(s) for s in out_tensor]
 
         stacked_vocab_dists = tf.stack(vocab_dists, axis=1)
@@ -133,6 +140,14 @@ class CaptioningNetwork():
         optimizer = tf.train.GradientDescentOptimizer(self.hyps['learning_rate'])
         grads_and_vars = optimizer.compute_gradients(self.loss)
         self.train_op = optimizer.apply_gradients(grads_and_vars, global_step=self.global_step)
+
+    def feed_forward_test(self, sess, batch):
+        feed_dict = self.make_feed_dict(batch)
+        fetches = {'output': self.out_tensor}
+
+        result = sess.run(fetches=fetches, feed_dict=feed_dict)
+        print('Feed forward Okkkk')
+        return result
 
     def run_train_step(self, sess, batch: Tuple):
         """
