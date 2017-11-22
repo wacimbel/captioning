@@ -2,7 +2,7 @@
 import tensorflow as tf
 from typing import Dict, List, Tuple
 import numpy as np
-import tensornets.tensornets as nets
+import tensornets as nets
 
 class CaptioningNetwork():
     def __init__(self, config):
@@ -57,32 +57,38 @@ class CaptioningNetwork():
         self.add_train_op()
         self.summaries = tf.summary.merge_all()
 
-    def add_model(self, rgb):
+    def add_model(self):
         """
         :return: Creates model (final variable from feed_dict). The output is to define the self.out_tensor
         object, which is the final prediction tensor used in the loss function
         """
         #We have to remember loading the weights for this layer
-        #CNN_lastlayer = nets.Inception3(rgb)
-        CNN_lastlayer = tf.Variable(np.random.rand(self.hyps['batch_size'], self.hyps['hidden_dim']))
+        CNN_lastlayer = nets.Inception3(self.X_pl)
+
+        W_transition = tf.get_variable('W_out', [CNN_lastlayer.shape[1], self.hyps['hidden_dim']])
+        b_transition = tf.get_variable('b_out', [self.hyps['hidden_dim']])
+
+        rnn_input = tf.nn.xw_plus_b(CNN_lastlayer, W_transition, b_transition, name='rnn_input')
 
         # self.y_pl has shape (batch_size, max_sentence_length)
         # caption_embedding has shape (batch_size, max_sentence_length, embedding_size)
         caption_embedding = self.embedding(self.y_pl)
 
-        rand_unif_init = tf.random_uniform_initializer(-self.hyps.rand_unif_init_mag, self.hyps.rand_unif_init_mag,
+        rand_unif_init = tf.random_uniform_initializer(-self.hyps['rand_unif_init_mag'], self.hyps['rand_unif_init_mag'],
                                                        seed=123)
         # CNN_lastlayer : [batch_size, hidden_dim]
         # caption_embedding : [batch_size, nb_LSTM_cells, embedding_size] where embedding_size = hidden_dim
 
 
-        lstmcell = tf.contrib.rnn.LSTMCell(self.hyps.hidden_dim, initializer=rand_unif_init)
-        outputs, state = tf.nn.dynamic_rnn(cell=lstmcell, initial_state=CNN_lastlayer, inputs=caption_embedding, dtype=tf.float32)
+        lstmcell = tf.contrib.rnn.LSTMCell(self.hyps['max_sentence_length'], initializer=rand_unif_init)
+        outputs, state = tf.nn.dynamic_rnn(cell=lstmcell, initial_state=rnn_input, inputs=caption_embedding, dtype=tf.float32)
 
+        print(outputs)
+        outputs = [tf.Variable(np.random.rand()) for i in range(self.hyps[])]
         # outputs : [batchsize, nombre de mots, hidden_dim]
 
-        W_out = tf.get_variable('W_out', [self.hyps.hidden_dim, self.hyps.vocab_size])
-        b_out = tf.get_variable('b_out', [self.hyps.vocab_size])
+        W_out = tf.get_variable('W_out', [self.hyps['hidden_dim'], self.hyps['vocab_size']])
+        b_out = tf.get_variable('b_out', [self.hyps['vocab_size']])
         
         out_tensor = []
         for output_batch in outputs:

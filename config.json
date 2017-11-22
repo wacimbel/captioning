@@ -15,5 +15,6 @@
   "im_height":368,
   "rand_unif_init_mag":0.02,
   "embedding_std":0.1,
-  "nb_LSTM_cells": 30
+  "nb_LSTM_cells": 30,
+  "embedding_sdv":0.01
 }

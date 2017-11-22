@@ -7,8 +7,8 @@ import matplotlib.pyplot as plt
 import datetime
 import time
 
-from .model import CaptioningNetwork
-from .data import Batcher, Vocab
+from model import CaptioningNetwork
+from data import Batcher, Vocab
 
 
 def setup_training(train_dir):
@@ -50,21 +50,22 @@ if __name__ == "__main__":
     model.build_graph()
 
     # Feed forward test
-    with sess:
-        sess.run(...)
-        output_shape = ...
-        print('Feed forward OK! Output shape: %s' % str(output_shape))
+       # with sess:
+    #     sess.run(...)
+    #     output_shape = ...
+    #     print('Feed forward OK! Output shape: %s' % str(output_shape))
 
-
-
+    ### Temporary test with one iteration
     # Training - to comment while testing the feed forward pass
     with sess:
         summary_writer = setup_training(train_dir)
 
         # Run training
         tf.logging.info('Starting training...')
-        while batcher.epoch_completed < config.epochs:
-
+        i=0
+        while i<1:
+        # while batcher.epoch_completed < config.epochs:
+            i += 1
             batch = batcher.next_batch()
 
             tf.logging.info('running training step...')
