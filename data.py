@@ -24,7 +24,7 @@ class Batcher():
         """
 
         self.train_path = os.path.join(data_path, 'train/')
-
+        self.val_path = os.path.join(data_path, 'val/')
         self.batch_size = config['batch_size']
         self.im_width = config['im_width']
         self.im_height = config['im_height']
@@ -32,20 +32,32 @@ class Batcher():
         self.vocab = vocab
         self.current_idx = 0
         self.epoch_completed = 0
-        self.load_annotations()
+        self.load_train_annotations()
+        self.load_val_annotations()
 
-    def load_annotations(self):
+    def load_train_annotations(self):
         annot = json.load(open(self.train_path+'annotations/captions_train2014.json', 'r'))
         available_im = os.listdir(self.train_path+'images/')
-        self.ids = [elem['id'] for elem in annot['images'] if elem['file_name'] in available_im]
+        self.train_ids = [elem['id'] for elem in annot['images'] if elem['file_name'] in available_im]
         
         self.nb_ids = len(self.ids)
         #random.shuffle(self.ids)
         
-        captions_list = [elem for elem in annot['annotations'] if elem['image_id'] in self.ids]
+        captions_list = [elem for elem in annot['annotations'] if elem['image_id'] in self.train_ids]
         #self.captions = pd.DataFrame(captions_list).groupby('image_id')['caption'].apply(list)
-        self.captions = pd.DataFrame(captions_list).set_index('image_id')
+        self.train_captions = pd.DataFrame(captions_list).set_index('image_id')
 
+        
+    def load_val_annotations(self):
+        annot = json.load(open(self.val_path+'annotations/captions_val2014.json', 'r'))
+        available_im = os.listdir(self.val_path+'images/')
+        self.val_ids = [elem['id'] for elem in annot['images'] if elem['file_name'] in available_im]
+
+
+        
+        captions_list = [elem for elem in annot['annotations'] if elem['image_id'] in self.val_ids]
+        #self.captions = pd.DataFrame(captions_list).groupby('image_id')['caption'].apply(list)
+        self.test_captions = pd.DataFrame(captions_list).set_index('image_id')
     
     def load_image(self, path):
         # load image
@@ -63,21 +75,21 @@ class Batcher():
         resized_img = skimage.transform.resize(padded_img, (self.im_width, self.im_height))        
         return resized_img
 
-    def next_batch(self, model):
+    def next_train_batch(self, model):
         """
         :return: a batch containing images and their encoded annotations, picked in the paths folder. Deals with
         the number of completed epochs.
         Images is of shape (batch_size, im_width, im_height)
         Annotations is of shape (batch_size, max_length)
         """
-        next_idx = self.current_idx+4
-        batch_ids = self.ids[self.current_idx:next_idx]
+        next_idx = self.current_idx+self.batch_size
+        batch_ids = self.train_ids[self.current_idx:next_idx]
         
         if next_idx > self.nb_ids:
             self.epoch_completed +=1
             random.shuffle(self.ids)
             remaining = next_idx - self.nb_ids
-            batch_ids += self.ids[:remaining]
+            batch_ids += self.train_ids[:remaining]
             next_idx = remaining
             
         imgs = np.zeros((self.batch_size, self.im_width, self.im_height, 3), dtype=np.float)
@@ -86,12 +98,29 @@ class Batcher():
         for i, image_id in enumerate(batch_ids):
             batch_idx = i % self.batch_size
             img_name = 'COCO_train2014_000000' + str(image_id) + '.jpg'
-            raw_img = self.load_image(self.train_path + 'images/' + img_name)
-            imgs[batch_idx, ...] = nets.preprocess(model, raw_img)
-            sentence = self.captions.loc[image_id].sample(1)['caption'].values[0]
+            imgs[batch_idx, ...] = self.load_image(self.train_path + 'images/' + img_name)
+            if model:
+                imgs[batch_idx, ...] = nets.preprocess(model, imgs[batch_idx, ...])
+            sentence = self.train_captions.loc[image_id].sample(1)['caption'].values[0]
             labels[batch_idx, ...] = self.encode_sentence(sentence, self.vocab)
         
         self.current_idx = next_idx
+
+        return imgs, labels
+        
+        
+    def next_val_batch(self, model):
+        imgs = np.zeros((self.batch_size, self.im_width, self.im_height, 3), dtype=np.float)
+        labels = []
+        
+        for i, image_id in enumerate(batch_ids):
+            batch_idx = i % self.batch_size
+            img_name = 'COCO_val2014_000000' + str(image_id) + '.jpg'
+            imgs[batch_idx, ...] = self.load_image(self.val_path + 'images/' + img_name)
+            if model:
+                imgs[batch_idx, ...] = nets.preprocess(model, imgs[batch_idx, ...])    
+            sentences = self.val_captions[image_id]
+            labels.append(sentences)
 
         return imgs, labels
         
