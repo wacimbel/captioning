@@ -54,7 +54,7 @@ class CaptioningNetwork():
 
     def add_operators(self):
         # Creating the training operators (loss/optimizers etc)
-        self.global_step = tf.Variable(0, trainable=False, name='global_step')
+        self.global_step = tf.Variable(0, dtype='int32', trainable=False, name='global_step')
         self.add_train_op()
         self.summaries = tf.summary.merge_all()
 
@@ -149,7 +149,7 @@ class CaptioningNetwork():
         fetches = {'output': self.out_tensor}
 
         result = sess.run(fetches=fetches, feed_dict=feed_dict)
-        print('Feed forward Okkkk')
+        print('Feed forward OK')
         return result
 
     def run_train_step(self, sess, batch: Tuple):
@@ -159,6 +159,7 @@ class CaptioningNetwork():
         """
 
         feed_dict = self.make_feed_dict(batch)
+        print(self.global_step)
         fetches = {'loss': self.loss,
                    'train_op': self.train_op,
                    'summary': self.summaries,
