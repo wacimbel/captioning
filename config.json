@@ -1,6 +1,6 @@
 {
 
-  "batch_size":10,
+  "batch_size":1,
   "hidden_dim":512,
   "embedding_size":512,
   "max_sentence_length":30,
@@ -16,5 +16,6 @@
   "rand_unif_init_mag":0.02,
   "embedding_std":0.1,
   "nb_LSTM_cells": 30,
-  "embedding_sdv":0.1
+  "embedding_sdv":0.1,
+  "learning_rate":0.01
 }

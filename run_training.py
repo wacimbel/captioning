@@ -10,7 +10,7 @@ import tensornets as nets
 from model import CaptioningNetwork
 from data import Batcher, Vocab
 
-
+# from tensorflow import word2
 def setup_training(model, train_dir):
     """
 
@@ -95,11 +95,18 @@ if __name__ == "__main__":
 
             summary_writer.add_summary(summaries, iteration['global_step'])  # write the summaries
 
-            if not i % 10:
-                print('Validate\n\n')
-                valid_batch = batcher.next_val_batch(model.cnn)
-                inferred = model.run_valid_step(sess, valid_batch)
-                words = np.array([list(i) for i in inferred['inference']])
+            if not i % 3:
+                print('Training samples\n')
+                valid_batch = batcher.next_train_batch(model.cnn)
+                # inferred = model.run_valid_step(sess, valid_batch)
+                # words = np.array([list(i) for i in inferred['inference']])
+
+
+                inferred = model.run_train_step(sess, valid_batch)
+                sentences = inferred['out_sentences']
+
+                words = np.array([list(i) for i in sentences])
+
                 sentences = np.transpose(words)
 
                 print('----- Predicted captions ------')
@@ -110,4 +117,4 @@ if __name__ == "__main__":
                 print('\n----- True captions ------')
 
                 for id, k in enumerate(valid_batch[1]):
-                    print(id, ' '.join(k[0]))
+                    print(id, ' '.join([vocab.get_index_word(j) for j in k]))

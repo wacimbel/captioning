@@ -1,7 +1,7 @@
 # Defining the model
+from typing import Dict, Tuple
+
 import tensorflow as tf
-from typing import Dict, List, Tuple
-import numpy as np
 import tensornets as nets
 
 class CaptioningNetwork():
@@ -58,11 +58,12 @@ class CaptioningNetwork():
         object, which is the final prediction tensor used in the loss function
         """
         #We have to remember loading the weights for this layer
+        xav_init = tf.contrib.layers.xavier_initializer(uniform=False)
 
         self.X_embeddings = tf.get_variable('X_embeddings',
                                             shape=[self.hyps['vocab_size'], self.hyps['embedding_size']],
                                             dtype=tf.float32,
-                                            initializer=tf.random_normal_initializer(stddev=self.hyps['embedding_sdv']))
+                                            initializer=xav_init)
 
         self.cnn = nets.Inception3(self.X_pl)
 
@@ -78,7 +79,6 @@ class CaptioningNetwork():
         caption_embedding = self.embedding(self.y_pl)
         inputs = tf.concat([cnn_output, caption_embedding], axis=1)
 
-        xav_init = tf.contrib.layers.xavier_initializer(uniform=False)
         # CNN_lastlayer : [batch_size, hidden_dim]
         # caption_embedding : [batch_size, nb_LSTM_cells, embedding_size] where embedding_size = hidden_dim
 
@@ -102,7 +102,9 @@ class CaptioningNetwork():
 
         stacked_vocab_dists = tf.stack(vocab_dists, axis=1)
         self.out_tensor = stacked_vocab_dists
+        print(self.out_tensor.get_shape())
 
+        self.out_sentences = [tf.argmax(i, axis=1) for i in vocab_dists]
 
 
         # Inference part of the graph
@@ -122,6 +124,7 @@ class CaptioningNetwork():
 
             distrib = tf.nn.xw_plus_b(tf.unstack(output, axis=1)[0], W_out, b_out)
             distrib = tf.nn.softmax(distrib)
+
             index = tf.argmax(distrib, axis=1)
             inferred.append(index)
             input = self.embedding(index)
@@ -159,7 +162,7 @@ class CaptioningNetwork():
         Assigns to a class variable the training operator (gradient iteration)
         """
         self.loss = self.calculate_loss(self.out_tensor, self.y_pl)
-        optimizer = tf.train.AdamOptimizer()
+        optimizer = tf.train.AdamOptimizer(learning_rate=self.hyps['learning_rate'])
         grads_and_vars = optimizer.compute_gradients(self.loss)
         self.global_step = tf.Variable(0, trainable=False, name='global_step')
         self.train_op = optimizer.apply_gradients(grads_and_vars, global_step=self.global_step)
@@ -182,7 +185,8 @@ class CaptioningNetwork():
         fetches = {'loss': self.loss,
                    'train_op': self.train_op,
                    'summary': self.summaries,
-                   'global_step': self.global_step
+                   'global_step': self.global_step,
+                   'out_sentences': self.out_sentences
                    }
 
         result = sess.run(fetches=fetches, feed_dict=feed_dict)
@@ -191,14 +195,17 @@ class CaptioningNetwork():
         return result
 
     def run_valid_step(self, sess, valid_batch):
-        feed_dict = self.make_feed_dict(valid_batch)
-        fetches = {'inference': self.inferred_tensor,
-                   'summary': self.summaries
+        fetches = {'inference': self.inferred_tensor
+                   # 'summary': self.summaries
                    }
+
+        feed_dict = {}
+        feed_dict[self.X_pl] = valid_batch[0]
 
         result = sess.run(fetches=fetches, feed_dict=feed_dict)
 
         return result
+
     def predict(self, input):
         """
 
