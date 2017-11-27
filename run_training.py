@@ -95,7 +95,7 @@ if __name__ == "__main__":
 
             summary_writer.add_summary(summaries, iteration['global_step'])  # write the summaries
 
-            if not i % 3:
+            if not i % 1:
                 print('Training samples\n')
                 valid_batch = batcher.next_train_batch(model.cnn)
                 # inferred = model.run_valid_step(sess, valid_batch)
