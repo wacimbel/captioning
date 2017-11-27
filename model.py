@@ -67,19 +67,27 @@ class CaptioningNetwork():
                                             dtype=tf.float32,
                                             initializer=embedding_init)
 
+
+        tf.summary.scalar('Embeddings', tf.reduce_sum(tf.square(self.X_embeddings)))
         self.cnn = nets.Inception3(self.X_pl)
+
+        tf.summary.scalar('Output cnn', tf.reduce_sum(tf.square(self.cnn)))
 
         CNN_lastlayer = self.cnn
         # Shape sortie: [batchsize, 1000]
+
 
         cnn_output = tf.contrib.layers.fully_connected(CNN_lastlayer, self.hyps['hidden_dim'], scope='cnn_output')
         # cnn_output has shape [batch_size, hidden_size]
         cnn_output = tf.expand_dims(cnn_output, axis=1)
         # cnn_output has shape [batch_size, 1, hidden_size]
 
+        tf.summary.scalar('Output cnn after fully connected', tf.reduce_sum(tf.square(cnn_output)))
+
         # self.y_pl has shape (batch_size, max_sentence_length)
         # caption_embedding has shape (batch_size, max_sentence_length, embedding_size)
         caption_embedding = self.embedding(self.y_pl)
+
         inputs = tf.concat([cnn_output, caption_embedding], axis=1)
 
         # CNN_lastlayer : [batch_size, hidden_dim]
@@ -88,6 +96,8 @@ class CaptioningNetwork():
         lstmcell = tf.contrib.rnn.LSTMCell(self.hyps['hidden_dim'])
 
         outputs, state = tf.nn.dynamic_rnn(cell=lstmcell,  inputs=inputs, dtype=tf.float32)
+
+        tf.summary.scalar('LSTM outputs', tf.reduce_sum(tf.square(outputs)))
 
         # outputs : [batchsize, nombre de mots, hidden_dim]
         out_tensor = []
@@ -101,29 +111,32 @@ class CaptioningNetwork():
 
         vocab_dists = [tf.nn.softmax(s) for s in out_tensor]
 
+        tf.summary.scalar('W_out', tf.reduce_sum(tf.square(W_out)))
 
-        for i, word in enumerate(vocab_dists):
-            top2 = tf.nn.top_k(word, k=2)
-            first_value = top2[0][0, 0]
-            second_value = top2[0][0, 1]
 
-            first_indices = top2[1][0, 0]
-            second_indices = top2[1][0, 1]
-
-            #Indices
-            tf.summary.scalar('TOP1 word %d' % i, first_indices)
-            tf.summary.scalar('TOP2 word %d' % i, second_indices)
-
-            #Values
-            tf.summary.scalar('TOP1 proba %d' % i, first_value)
-            tf.summary.scalar('TOP2 proba %d' % i, second_value)
+        # for i, word in enumerate(vocab_dists):
+        #     top2 = tf.nn.top_k(word, k=2)
+        #     first_value = top2[0][0, 0]
+        #     second_value = top2[0][0, 1]
+        #
+        #     first_indices = top2[1][0, 0]
+        #     second_indices = top2[1][0, 1]
+        #
+        #     #Indices
+        #     tf.summary.scalar('TOP1 word %d' % i, first_indices)
+        #     tf.summary.scalar('TOP2 word %d' % i, second_indices)
+        #
+        #     #Values
+        #     tf.summary.scalar('TOP1 proba %d' % i, first_value)
+        #     tf.summary.scalar('TOP2 proba %d' % i, second_value)
 
 
         stacked_vocab_dists = tf.stack(vocab_dists, axis=1)
 
         self.out_tensor = stacked_vocab_dists
+
         print(self.out_tensor.get_shape())
-        tf.summary.tensor_summary('distrib', self.out_tensor)
+        # tf.summary.tensor_summary('distrib', self.out_tensor)
 
         self.out_sentences = [tf.argmax(i, axis=1) for i in vocab_dists]
 

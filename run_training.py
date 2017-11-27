@@ -98,9 +98,7 @@ if __name__ == "__main__":
 
             summary_writer.add_summary(summaries, iteration['global_step'])  # write the summaries
 
-            print('Iteration %d -- %5.2f' % (i, loss))
-
-            if not i % 10:
+            if not i % 1:
                 valid_batch = batcher.next_train_batch(model.cnn)
                 # inferred = model.run_valid_step(sess, valid_batch)
                 # words = np.array([list(i) for i in inferred['inference']])
@@ -113,12 +111,12 @@ if __name__ == "__main__":
 
                 sentences = np.transpose(words)
 
-                print('----- Predicted captions ------')
+                print('\n\n----- Iteration %d -- %5.2f ---- Predicted captions ------' % (i, loss))
 
                 for id, k in enumerate(sentences):
                     print(id, ' '.join([vocab.get_index_word(j) for j in k]))
 
-                print('\n----- True captions ------')
+                # print('\n----- True captions ------')
 
                 for id, k in enumerate(valid_batch[1]):
                     print(id, ' '.join([vocab.get_index_word(j) for j in k]))

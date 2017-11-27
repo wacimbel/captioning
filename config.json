@@ -1,9 +1,9 @@
 {
 
   "batch_size":1,
-  "hidden_dim":512,
-  "embedding_size":512,
-  "max_sentence_length":10,
+  "hidden_dim":100,
+  "embedding_size":100,
+  "max_sentence_length":30,
   "nb_channels":3,
   "epochs":100,
   "VGG_finetuning":true,
@@ -14,7 +14,7 @@
   "im_height":368,
   "rand_unif_init_mag":0.02,
   "embedding_std":1,
-  "nb_LSTM_cells": 10,
-  "embedding_sdv":0.1,
-  "learning_rate":0.01
+  "nb_LSTM_cells": 30,
+  "embedding_sdv":1,
+  "learning_rate":0.0005
 }
