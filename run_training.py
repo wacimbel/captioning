@@ -34,11 +34,11 @@ def setup_training(model, train_dir):
 if __name__ == "__main__":
 
     config = json.load(open('config.json', 'r'))
-    model = CaptioningNetwork(config)
     data_path = 'coco/'
     train_dir = 'summaries/Caption_training' + datetime.datetime.strftime(datetime.datetime.today(), '%d%m%Y%H%M%S')
 
     vocab = Vocab('vocab')
+    model = CaptioningNetwork(config, vocab)
 
     batcher = Batcher(data_path, config, vocab)
 
@@ -48,6 +48,10 @@ if __name__ == "__main__":
     sess = tf.Session()
     tf.logging.info('Building graph...')
     model.build_graph()
+
+    # print(tf.GraphKeys.GLOBAL_VARIABLES)
+    # print(tf.GraphKeys.TRAINABLE_VARIABLES)
+
 
     # Feed forward test
        # with sess:
@@ -77,10 +81,9 @@ if __name__ == "__main__":
 
         # model.feed_forward_test(sess, batcher.next_batch(model.cnn))
         i = 0
-        while i < 100:
+        while i < 1000:
         # while batcher.epoch_completed < config.epochs:
             i += 1
-            print('Iteration %d' % i)
             batch = batcher.next_train_batch(model.cnn)
             tf.logging.info('running training step...')
             t0 = time.time()
@@ -95,8 +98,9 @@ if __name__ == "__main__":
 
             summary_writer.add_summary(summaries, iteration['global_step'])  # write the summaries
 
-            if not i % 1:
-                print('Training samples\n')
+            print('Iteration %d -- %5.2f' % (i, loss))
+
+            if not i % 10:
                 valid_batch = batcher.next_train_batch(model.cnn)
                 # inferred = model.run_valid_step(sess, valid_batch)
                 # words = np.array([list(i) for i in inferred['inference']])

@@ -181,9 +181,11 @@ class Vocab():
 
     def get_index_count(self, index):
         return self.index_to_counts[index]
+        # return self.index_to_counts.get(index, 0)
 
     def get_index_word(self, index):
         return self.index_to_word[index]
-    
+        # return self.index_to_word.get(index, '<UNK>')
+
     def add_start_end(self, ids):
         return [2] + ids + [3]
