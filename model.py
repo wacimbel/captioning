@@ -71,7 +71,7 @@ class CaptioningNetwork():
                                                 shape=[self.vocab.size, self.hyps['embedding_size']],
                                                 dtype=tf.float32,
                                                 initializer=embedding_init)
-        #
+
         else:
             self.X_embeddings = tf.Variable(np.load('./embedding_captioning.npy'), trainable=False, dtype=tf.float32)
 
