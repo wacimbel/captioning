@@ -14,6 +14,8 @@ class CaptioningNetwork():
 
         self.hyps = config
         self.vocab = vocab
+        for key, value in self.hyps.items():
+            print(key, ":", value)
 
     def create_placeholders(self):
         """
@@ -61,7 +63,8 @@ class CaptioningNetwork():
         """
         #We have to remember loading the weights for this layer
         xav_init = tf.contrib.layers.xavier_initializer(uniform=False)
-        embedding_init = tf.initializers.truncated_normal(0, self.hyps['embedding_sdv'])
+        # embedding_init = tf.initializers.truncated_normal(0, self.hyps['embedding_sdv'])
+        embedding_init = tf.truncated_normal_initializer(0, self.hyps['embedding_sdv'])
 
         if self.hyps['pretrained_embedding'] == False:
             self.X_embeddings = tf.get_variable('X_embeddings',
@@ -195,11 +198,11 @@ class CaptioningNetwork():
         # results = -tf.log(tf.stack(results))
         #
         temp = tf.one_hot(y_pl, depth=self.vocab.size, axis=-1)
+        loss = tf.nn.softmax_cross_entropy_with_logits(labels=temp, logits=preds)
 
         if self.hyps['masking_loss']: # With masking
             zero = tf.constant(0, dtype=tf.int32)
             mask = tf.not_equal(y_pl, zero)
-            loss = tf.nn.softmax_cross_entropy_with_logits(labels=temp, logits=preds)
 
             if self.hyps['normalize_loss']:
                 lens = tf.count_nonzero(y_pl, axis=1, dtype=tf.float32)
@@ -210,11 +213,12 @@ class CaptioningNetwork():
             loss = tf.reduce_sum(loss)
 
         else: # Without masking
-            lens = tf.count_nonzero(y_pl, axis=1, dtype=tf.float32)
-            lens = tf.expand_dims(lens, axis=1)
-            loss = tf.nn.softmax_cross_entropy_with_logits(labels=temp, logits=preds)
 
-            loss = tf.divide(loss, lens)
+            if self.hyps['normalize_loss']:
+                lens = tf.count_nonzero(y_pl, axis=1, dtype=tf.float32)
+                lens = tf.expand_dims(lens, axis=1)
+                loss = tf.divide(loss, lens)
+
             loss = tf.reduce_sum(loss)
 
         tf.summary.scalar('loss', loss)
