@@ -55,7 +55,7 @@ class Batcher():
         
         captions_list = [elem for elem in annot['annotations'] if elem['image_id'] in self.val_ids]
         #self.captions = pd.DataFrame(captions_list).groupby('image_id')['caption'].apply(list)
-        self.val_captions = pd.DataFrame(captions_list).groupby('image_id')['caption'].apply(list)
+        self.val_captions = pd.DataFrame(captions_list).set_index('image_id')
     
     def load_image(self, path):
         # load image
@@ -115,7 +115,7 @@ class Batcher():
         batch_ids = self.val_ids[:self.batch_size]
         
         imgs = np.zeros((self.batch_size, self.im_width, self.im_height, 3), dtype=np.float)
-        labels = []
+        labels = np.zeros((self.batch_size, self.max_len), dtype=np.int)
         
         for i, image_id in enumerate(batch_ids):
             batch_idx = i % self.batch_size
@@ -123,8 +123,8 @@ class Batcher():
             imgs[batch_idx, ...] = self.load_image(self.val_path + 'images/' + img_name)
             if model is not None:
                 imgs[batch_idx, ...] = nets.preprocess(model, imgs[batch_idx, ...])    
-            sentences = self.val_captions[image_id]
-            labels.append(sentences)
+            sentences = self.val_captions.loc[image_id].iloc[0]['caption']
+            labels[batch_idx, ...] = self.encode_sentence(sentences, self.vocab)
 
         return imgs, labels
         
