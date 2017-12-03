@@ -25,6 +25,7 @@ class Batcher():
         self.train_path = os.path.join(data_path, 'train/')
         self.val_path = os.path.join(data_path, 'val/')
         self.batch_size = config['batch_size']
+        self.valid_batch_size = config['valid_batch_size']
         self.im_width = config['im_width']
         self.im_height = config['im_height']
         self.max_len = config['nb_LSTM_cells']
@@ -107,18 +108,17 @@ class Batcher():
         self.current_idx = next_idx
 
         return imgs, labels
-        
-        
+
     def next_val_batch(self, model):
         
         random.shuffle(self.val_ids)
-        batch_ids = self.val_ids[:self.batch_size]
+        batch_ids = self.val_ids[:self.valid_batch_size]
         
         imgs = np.zeros((self.batch_size, self.im_width, self.im_height, 3), dtype=np.float)
         labels = np.zeros((self.batch_size, self.max_len), dtype=np.int)
-        
+
         for i, image_id in enumerate(batch_ids):
-            batch_idx = i % self.batch_size
+            batch_idx = i % self.valid_batch_size
             img_name = 'COCO_val2014_000000' + str(image_id) + '.jpg'
             imgs[batch_idx, ...] = self.load_image(self.val_path + 'images/' + img_name)
             if model is not None:

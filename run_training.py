@@ -98,20 +98,24 @@ if __name__ == "__main__":
 
             summary_writer.add_summary(summaries, iteration['global_step'])  # write the summaries
 
+
+            ## Validation
             if not i % 1:
                 valid_batch = batcher.next_train_batch(model.cnn)
-                # inferred = model.run_valid_step(sess, valid_batch)
-                # words = np.array([list(i) for i in inferred['inference']])
+                # valid_batch = batcher.next_val_batch(model.cnn)
+
+                inferred = model.run_valid_step(sess, valid_batch)
+                words = np.array([list(i) for i in inferred['inference']])
 
 
-                inferred = model.run_train_step(sess, valid_batch)
-                sentences = inferred['out_sentences']
-
-                words = np.array([list(i) for i in sentences])
+                # inferred = model.run_train_step(sess, valid_batch)
+                # sentences = inferred['out_sentences']
+                #
+                # words = np.array([list(i) for i in sentences])
 
                 sentences = np.transpose(words)
 
-                print('\n\n----- Iteration %d -- %5.2f ---- Predicted captions ------' % (i, loss))
+                print('\n\n----- Iteration %d -- %5.2f ----' % (i, loss))
 
                 success_rate = 0
                 for id, k in enumerate(sentences):

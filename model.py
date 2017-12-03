@@ -22,8 +22,8 @@ class CaptioningNetwork():
 
         :return: Creates all the necessary placeholders for the training loop, as class variables
         """
-        self.X_pl = tf.placeholder(tf.float32, shape=[self.hyps['batch_size'], self.hyps['im_width'], self.hyps['im_height'], self.hyps['nb_channels']], name='X_input')
-        self.y_pl = tf.placeholder(tf.int32, shape=[self.hyps['batch_size'], self.hyps['max_sentence_length']], name='y_target_in')
+        self.X_pl = tf.placeholder(tf.float32, shape=[None, self.hyps['im_width'], self.hyps['im_height'], self.hyps['nb_channels']], name='X_input')
+        self.y_pl = tf.placeholder(tf.int32, shape=[None, self.hyps['max_sentence_length']], name='y_target_in')
 
     def make_feed_dict(self, batch: Tuple) -> Dict:
         """
@@ -54,6 +54,7 @@ class CaptioningNetwork():
     def add_operators(self):
         # Creating the training operators (loss/optimizers etc)
         self.add_train_op()
+        self.add_valid_op()
         self.summaries = tf.summary.merge_all()
 
     def add_model(self):
@@ -61,6 +62,7 @@ class CaptioningNetwork():
         :return: Creates model (final variable from feed_dict). The output is to define the self.out_tensor
         object, which is the final prediction tensor used in the loss function
         """
+
         #We have to remember loading the weights for this layer
         xav_init = tf.contrib.layers.xavier_initializer(uniform=False)
         # embedding_init = tf.initializers.truncated_normal(0, self.hyps['embedding_sdv'])
@@ -78,7 +80,7 @@ class CaptioningNetwork():
         # tf.summary.scalar('Embeddings', tf.reduce_sum(tf.square(self.X_embeddings)))
         self.cnn = nets.Inception3(self.X_pl)
 
-        tf.summary.scalar('Output cnn', tf.reduce_sum(tf.square(self.cnn)))
+        # tf.summary.scalar('Output cnn', tf.reduce_sum(tf.square(self.cnn)))
 
         CNN_lastlayer = self.cnn
         # Shape sortie: [batchsize, 1000]
@@ -89,7 +91,7 @@ class CaptioningNetwork():
         cnn_output = tf.expand_dims(cnn_output, axis=1)
         # cnn_output has shape [batch_size, 1, hidden_size]
 
-        tf.summary.scalar('Output cnn after fully connected', tf.reduce_sum(tf.square(cnn_output)))
+        # tf.summary.scalar('Output cnn after fully connected', tf.reduce_sum(tf.square(cnn_output)))
 
         # self.y_pl has shape (batch_size, max_sentence_length)
         # caption_embedding has shape (batch_size, max_sentence_length, embedding_size)
@@ -104,7 +106,7 @@ class CaptioningNetwork():
 
         outputs, state = tf.nn.dynamic_rnn(cell=lstmcell,  inputs=inputs, dtype=tf.float32)
 
-        tf.summary.scalar('LSTM outputs', tf.reduce_sum(tf.square(outputs)))
+        # tf.summary.scalar('LSTM outputs', tf.reduce_sum(tf.square(outputs)))
 
         # outputs : [batchsize, nombre de mots, hidden_dim]
         out_tensor = []
@@ -118,27 +120,6 @@ class CaptioningNetwork():
             out_tensor.append(tf.nn.xw_plus_b(output_batch, W_out, b_out))
 
         vocab_dists = [tf.nn.softmax(s) for s in out_tensor]
-        vocab_dists = [tf.nn.softmax(s) for s in out_tensor]
-
-        tf.summary.scalar('W_out', tf.reduce_sum(tf.square(W_out)))
-        tf.summary.scalar('b_out', tf.reduce_sum(b_out))
-
-
-        # for i, word in enumerate(vocab_dists):
-        #     top2 = tf.nn.top_k(word, k=2)
-        #     first_value = top2[0][0, 0]
-        #     second_value = top2[0][0, 1]
-        #
-        #     first_indices = top2[1][0, 0]
-        #     second_indices = top2[1][0, 1]
-        #
-        #     #Indices
-        #     tf.summary.scalar('TOP1 word %d' % i, first_indices)
-        #     tf.summary.scalar('TOP2 word %d' % i, second_indices)
-        #
-        #     #Values
-        #     tf.summary.scalar('TOP1 proba %d' % i, first_value)
-        #     tf.summary.scalar('TOP2 proba %d' % i, second_value)
 
         stacked_vocab_dists = tf.stack(vocab_dists, axis=1)
 
@@ -150,7 +131,7 @@ class CaptioningNetwork():
         self.out_sentences = [tf.argmax(i, axis=1) for i in vocab_dists]
 
 
-        # Inference part of the graph
+        # Inference / validation part of the graph
         input = cnn_output
         inferred = []
 
@@ -158,26 +139,29 @@ class CaptioningNetwork():
 
         # Input the token <GO>
         input = self.embedding(2)
+
         # Batch size expand
-        input = tf.stack([input for i in range(cnn_output.get_shape()[0])])
+        # input = tf.stack([input for i in range(cnn_output.get_shape()[0])])
+        input = tf.stack([input for i in range(self.hyps['valid_batch_size'])])
+
         # Sentence dimension expand
         input = tf.expand_dims(input, axis=1)
 
+        valid_dists = []
         for steps in range(self.hyps['max_sentence_length']):
 
             output, state = tf.nn.dynamic_rnn(cell=lstmcell, inputs=input, initial_state=state)
 
             distrib = tf.nn.xw_plus_b(tf.unstack(output, axis=1)[0], W_out, b_out)
             distrib = tf.nn.softmax(distrib)
+            valid_dists.append(distrib)
             index = tf.argmax(distrib, axis=1)
             inferred.append(index)
             input = self.embedding(index)
             input = tf.expand_dims(input, axis=1)
 
-        self.inferred_tensor = inferred
-
-
-
+        self.out_tensor_valid = tf.stack(valid_dists, axis=1)
+        self.inferred_sentence = inferred
             
     def calculate_loss(self, preds, y_pl):
         """
@@ -200,7 +184,7 @@ class CaptioningNetwork():
         temp = tf.one_hot(y_pl, depth=self.vocab.size, axis=-1)
         loss = tf.nn.softmax_cross_entropy_with_logits(labels=temp, logits=preds)
 
-        if self.hyps['masking_loss']: # With masking
+        if self.hyps['masking_loss']:  # With masking
             zero = tf.constant(0, dtype=tf.int32)
             mask = tf.not_equal(y_pl, zero)
 
@@ -212,7 +196,7 @@ class CaptioningNetwork():
             loss = tf.boolean_mask(loss, mask)
             loss = tf.reduce_sum(loss)
 
-        else: # Without masking
+        else:  # Without masking
 
             if self.hyps['normalize_loss']:
                 lens = tf.count_nonzero(y_pl, axis=1, dtype=tf.float32)
@@ -221,20 +205,28 @@ class CaptioningNetwork():
 
             loss = tf.reduce_sum(loss)
 
-        tf.summary.scalar('loss', loss)
+        loss = loss / self.hyps['batch_size']
 
         return loss
+
+    def add_valid_op(self):
+        self.valid_loss = self.calculate_loss(self.out_tensor_valid, self.y_pl)
+        tf.summary.scalar('valid_loss', self.valid_loss)
 
     def add_train_op(self):
         """
         Assigns to a class variable the training operator (gradient iteration)
         """
         self.loss = self.calculate_loss(self.out_tensor, self.y_pl)
+        tf.summary.scalar('train_loss', self.loss)
+
         # optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.hyps['sgd_learning_rate'])
         optimizer = tf.train.AdamOptimizer(learning_rate=self.hyps['adam_learning_rate'])
         grads_and_vars = optimizer.compute_gradients(self.loss)
         self.global_step = tf.Variable(0, trainable=False, name='global_step')
         self.train_op = optimizer.apply_gradients(grads_and_vars, global_step=self.global_step)
+        self.learning_rate = optimizer._lr_t
+        tf.summary.scalar('learning_rate', optimizer._lr_t)
 
     def feed_forward_test(self, sess, batch):
         feed_dict = self.make_feed_dict(batch)
@@ -255,7 +247,8 @@ class CaptioningNetwork():
                    'train_op': self.train_op,
                    'summary': self.summaries,
                    'global_step': self.global_step,
-                   'out_sentences': self.out_sentences
+                   'out_sentences': self.out_sentences,
+                   'lr': self.learning_rate
                    }
 
         result = sess.run(fetches=fetches, feed_dict=feed_dict)
@@ -264,12 +257,12 @@ class CaptioningNetwork():
         return result
 
     def run_valid_step(self, sess, valid_batch):
-        fetches = {'inference': self.inferred_tensor
-                   # 'summary': self.summaries
+        fetches = {'inference': self.inferred_sentence,
+                   'valid_loss': self.valid_loss,
+                   'summary': self.summaries
                    }
 
-        feed_dict = {}
-        feed_dict[self.X_pl] = valid_batch[0]
+        feed_dict = self.make_feed_dict(valid_batch)
 
         result = sess.run(fetches=fetches, feed_dict=feed_dict)
 
