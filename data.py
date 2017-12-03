@@ -14,7 +14,6 @@ import json
 import tensornets as nets
 
 
-
 class Batcher():
 
     def __init__(self, data_path, config, vocab):
@@ -189,3 +188,4 @@ class Vocab():
 
     def add_start_end(self, ids):
         return [2] + ids + [3]
+

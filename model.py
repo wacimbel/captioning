@@ -4,6 +4,7 @@ from typing import Dict, Tuple
 import tensorflow as tf
 import tensornets as nets
 import numpy as np
+
 class CaptioningNetwork():
     def __init__(self, config, vocab):
         """
@@ -62,13 +63,16 @@ class CaptioningNetwork():
         xav_init = tf.contrib.layers.xavier_initializer(uniform=False)
         embedding_init = tf.initializers.truncated_normal(0, self.hyps['embedding_sdv'])
 
-        self.X_embeddings = tf.get_variable('X_embeddings',
-                                            shape=[self.vocab.size, self.hyps['embedding_size']],
-                                            dtype=tf.float32,
-                                            initializer=embedding_init)
+        if self.hyps['pretrained_embedding'] == False:
+            self.X_embeddings = tf.get_variable('X_embeddings',
+                                                shape=[self.vocab.size, self.hyps['embedding_size']],
+                                                dtype=tf.float32,
+                                                initializer=embedding_init)
+        #
+        else:
+            self.X_embeddings = tf.Variable(np.load('./embedding_captioning.npy'), trainable=False, dtype=tf.float32)
 
-
-        tf.summary.scalar('Embeddings', tf.reduce_sum(tf.square(self.X_embeddings)))
+        # tf.summary.scalar('Embeddings', tf.reduce_sum(tf.square(self.X_embeddings)))
         self.cnn = nets.Inception3(self.X_pl)
 
         tf.summary.scalar('Output cnn', tf.reduce_sum(tf.square(self.cnn)))
@@ -106,12 +110,15 @@ class CaptioningNetwork():
         W_out = tf.get_variable('W_out', [self.hyps['hidden_dim'], self.vocab.size], initializer=xav_init)
         b_out = tf.get_variable('b_out', [self.vocab.size])
 
+
         for output_batch in unstacked_outputs[1:]:
             out_tensor.append(tf.nn.xw_plus_b(output_batch, W_out, b_out))
 
         vocab_dists = [tf.nn.softmax(s) for s in out_tensor]
+        vocab_dists = [tf.nn.softmax(s) for s in out_tensor]
 
         tf.summary.scalar('W_out', tf.reduce_sum(tf.square(W_out)))
+        tf.summary.scalar('b_out', tf.reduce_sum(b_out))
 
 
         # for i, word in enumerate(vocab_dists):
@@ -129,7 +136,6 @@ class CaptioningNetwork():
         #     #Values
         #     tf.summary.scalar('TOP1 proba %d' % i, first_value)
         #     tf.summary.scalar('TOP2 proba %d' % i, second_value)
-
 
         stacked_vocab_dists = tf.stack(vocab_dists, axis=1)
 
@@ -188,11 +194,28 @@ class CaptioningNetwork():
         #
         # results = -tf.log(tf.stack(results))
         #
-
         temp = tf.one_hot(y_pl, depth=self.vocab.size, axis=-1)
 
-        loss = tf.nn.softmax_cross_entropy_with_logits(labels=temp, logits=preds)
-        loss = tf.reduce_sum(loss)
+        if self.hyps['masking_loss']: # With masking
+            zero = tf.constant(0, dtype=tf.int32)
+            mask = tf.not_equal(y_pl, zero)
+            loss = tf.nn.softmax_cross_entropy_with_logits(labels=temp, logits=preds)
+
+            if self.hyps['normalize_loss']:
+                lens = tf.count_nonzero(y_pl, axis=1, dtype=tf.float32)
+                lens = tf.expand_dims(lens, axis=1)
+                loss = tf.divide(loss, lens)
+
+            loss = tf.boolean_mask(loss, mask)
+            loss = tf.reduce_sum(loss)
+
+        else: # Without masking
+            lens = tf.count_nonzero(y_pl, axis=1, dtype=tf.float32)
+            lens = tf.expand_dims(lens, axis=1)
+            loss = tf.nn.softmax_cross_entropy_with_logits(labels=temp, logits=preds)
+
+            loss = tf.divide(loss, lens)
+            loss = tf.reduce_sum(loss)
 
         tf.summary.scalar('loss', loss)
 
@@ -203,7 +226,8 @@ class CaptioningNetwork():
         Assigns to a class variable the training operator (gradient iteration)
         """
         self.loss = self.calculate_loss(self.out_tensor, self.y_pl)
-        optimizer = tf.train.AdamOptimizer(learning_rate=self.hyps['learning_rate'])
+        # optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.hyps['sgd_learning_rate'])
+        optimizer = tf.train.AdamOptimizer(learning_rate=self.hyps['adam_learning_rate'])
         grads_and_vars = optimizer.compute_gradients(self.loss)
         self.global_step = tf.Variable(0, trainable=False, name='global_step')
         self.train_op = optimizer.apply_gradients(grads_and_vars, global_step=self.global_step)

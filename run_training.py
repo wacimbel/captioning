@@ -113,10 +113,21 @@ if __name__ == "__main__":
 
                 print('\n\n----- Iteration %d -- %5.2f ---- Predicted captions ------' % (i, loss))
 
+                success_rate = 0
                 for id, k in enumerate(sentences):
-                    print(id, ' '.join([vocab.get_index_word(j) for j in k]))
+                    pred = [vocab.get_index_word(j) for j in k]
+                    true = [vocab.get_index_word(j) for j in valid_batch[1][id]]
+
+                    mask = len([i for i in true if i != '<PAD>'])
+
+                    success_rate += pred[:mask]==true[:mask]
+                    print(id, ' '.join(pred))
+                    print(id, ' '.join(true))
+                    print('\n')
+
+                print('Success rate: %d / %d' % (success_rate, len(sentences)))
 
                 # print('\n----- True captions ------')
-
-                for id, k in enumerate(valid_batch[1]):
-                    print(id, ' '.join([vocab.get_index_word(j) for j in k]))
+                #
+                # for id, k in enumerate(valid_batch[1]):
+                #     print(id, ' '.join([vocab.get_index_word(j) for j in k]))
