@@ -33,7 +33,8 @@ def setup_training(model, train_dir):
 
 
 def run_and_print_validation(iteration_id, model, batcher, vocab):
-    valid_batch = batcher.next_val_batch(model.cnn)
+    # valid_batch = batcher.next_val_batch(model.cnn)
+    valid_batch = batcher.next_train_batch(model.cnn)
 
     inferred = model.run_valid_step(sess, valid_batch)
     valid_loss = inferred['valid_loss']
@@ -70,7 +71,7 @@ def print_training(iteration_id, iteration, batch, vocab):
 
         mask = len([i for i in true if i != '<PAD>'])
 
-        success_rate += pred[:mask] == true[:mask]
+        success_rate += pred[:mask] == true[2:mask+1]
         print(id, ' '.join(pred))
         print(id, ' '.join(true))
         # print('\n')
@@ -112,9 +113,7 @@ if __name__ == "__main__":
     with sess:
 
         nets.pretrained(model.cnn)
-
         model.add_operators()
-
         sess.run(tf.global_variables_initializer())
 
         summary_writer = setup_training(model, train_dir)
@@ -147,65 +146,11 @@ if __name__ == "__main__":
             ## Validation
             if not i % 1:
 
-                ## Print training
-                # words = np.array([list(i) for i in sentences])
-
-                # print('\n\n----- TRANING --- Iteration %d -- Train loss: %5.2f' % (i, loss))
-                # train_words = np.array([list(i) for i in iteration['out_sentences']])
-                # train_sentences = np.transpose(train_words)
-                #
-                # success_rate = 0
-                # for id, k in enumerate(train_sentences):
-                #     pred = [vocab.get_index_word(j) for j in k]
-                #     true = [vocab.get_index_word(j) for j in batch[1][id]]
-                #
-                #     mask = len([i for i in true if i != '<PAD>'])
-                #
-                #     success_rate += pred[:mask] == true[:mask]
-                #     print(id, ' '.join(pred))
-                #     print(id, ' '.join(true))
-                #     print('\n')
-                # print('Success rate: %d / %d' % (success_rate, len(train_sentences)))
-
-                # valid_batch = batcher.next_train_batch(model.cnn)
-                # valid_batch = batcher.next_val_batch(model.cnn)
-                #
-                # inferred = model.run_valid_step(sess, valid_batch)
-                # valid_loss = inferred['valid_loss']
-                #
-                # valid_words = np.array([list(i) for i in inferred['inference']])
-                # valid_sentences = np.transpose(valid_words)
-
-                # inferred = model.run_train_step(sess, valid_batch)
-                # sentences = inferred['out_sentences']
-                #
-
-                ## Print validation
-                #
-                # print('\n\n----- VALIDATION --- Iteration %d -- Valid loss: %5.2f' % (i, valid_loss))
-                #
-                # success_rate = 0
-                # for id, k in enumerate(valid_sentences):
-                #     pred = [vocab.get_index_word(j) for j in k]
-                #     true = [vocab.get_index_word(j) for j in valid_batch[1][id]]
-                #
-                #     mask = len([i for i in true if i != '<PAD>'])
-                #
-                #     success_rate += pred[:mask]==true[:mask]
-                #     print(id, ' '.join(pred))
-                #     print(id, ' '.join(true))
-                #     print('\n')
-                #
-                # print('Success rate: %d / %d' % (success_rate, len(valid_sentences)))
-                #
 
                 print('\n\n###############################################################################################')
                 print('------------------------------------ ITERATION %d ---------------------------------------------' % i)
+
                 print_training(i, iteration, train_batch, vocab)
 
                 run_and_print_validation(i, model, batcher, vocab)
-
-                # print('\n----- True captions ------')
-                #
-                # for id, k in enumerate(valid_batch[1]):
-                #     print(id, ' '.join([vocab.get_index_word(j) for j in k]))
+#

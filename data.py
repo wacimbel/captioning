@@ -49,10 +49,9 @@ class Batcher():
         
     def load_val_annotations(self):
         annot = json.load(open(self.val_path+'annotations/captions_val2014.json', 'r'))
+
         available_im = os.listdir(self.val_path+'images/')
         self.val_ids = [elem['id'] for elem in annot['images'] if elem['file_name'] in available_im]
-
-
         
         captions_list = [elem for elem in annot['annotations'] if elem['image_id'] in self.val_ids]
         #self.captions = pd.DataFrame(captions_list).groupby('image_id')['caption'].apply(list)
