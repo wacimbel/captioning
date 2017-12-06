@@ -114,8 +114,8 @@ class Batcher():
         random.shuffle(self.val_ids)
         batch_ids = self.val_ids[:self.valid_batch_size]
         
-        imgs = np.zeros((self.batch_size, self.im_width, self.im_height, 3), dtype=np.float)
-        labels = np.zeros((self.batch_size, self.max_len), dtype=np.int)
+        imgs = np.zeros((self.valid_batch_size, self.im_width, self.im_height, 3), dtype=np.float)
+        labels = np.zeros((self.valid_batch_size, self.max_len), dtype=np.int)
 
         for i, image_id in enumerate(batch_ids):
             batch_idx = i % self.valid_batch_size

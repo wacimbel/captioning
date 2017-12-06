@@ -4,6 +4,7 @@ from typing import Dict, Tuple
 import tensorflow as tf
 import tensornets as nets
 import numpy as np
+from create_graph import CaptioningGraph
 
 class CaptioningNetwork():
     def __init__(self, config, vocab):
@@ -26,6 +27,7 @@ class CaptioningNetwork():
         self.y_pl = tf.placeholder(tf.int32, shape=[None, self.hyps['max_sentence_length']], name='y_target_in')
 
     def make_feed_dict(self, batch: Tuple) -> Dict:
+    # def make_feed_dict(self, graph, batch: Tuple) -> Dict:
         """
 
         :param batch: Tuple with images and associated annotations
@@ -35,6 +37,9 @@ class CaptioningNetwork():
         images, annotations = batch
         feed_dict[self.X_pl] = images
         feed_dict[self.y_pl] = annotations
+        # #
+        # feed_dict[graph.X_pl] = images
+        # feed_dict[graph.y_pl] = annotations
 
         return feed_dict
 
@@ -50,6 +55,11 @@ class CaptioningNetwork():
 
         # Creating model
         self.add_model()
+
+        # Create graph from class
+        # self.training_graph = CaptioningGraph(self.hyps, self.vocab, 'training')
+        # self.validation_graph = CaptioningGraph(self.hyps, self.vocab, 'validation')
+
 
     def add_operators(self):
         # Creating the training operators (loss/optimizers etc)
@@ -135,22 +145,33 @@ class CaptioningNetwork():
         input = cnn_output
         inferred = []
 
+        print('input shape', input.get_shape())
         output, state = tf.nn.dynamic_rnn(cell=lstmcell, inputs=input, dtype=tf.float32)
+
+        print('output shape', output.get_shape())
+        print('state shape', state)
 
         # Input the token <GO>
         input = self.embedding(2)
+        input = tf.expand_dims(input, axis=0)
 
-        # Batch size expand
-        # input = tf.stack([input for i in range(cnn_output.get_shape()[0])])
-        input = tf.stack([input for i in range(self.hyps['valid_batch_size'])])
+        # Batch size expand (Adding <GO> for all elements of the batch)
+        ## The hard challenge here is to imitate the shape of the incoming tensor cnn_output, which is None
 
-        # Sentence dimension expand
-        input = tf.expand_dims(input, axis=1)
+        # input = tf.stack([input for i in tf.range(0, limit=tf.shape(cnn_output)[0])])
+        # input = tf.tile(input, tf.constant([tf.shape(cnn_output)[0].value, 1]))
+        # input = tf.stack([input for i in range(self.hyps['valid_batch_size'])])
+        # input = tf.expand_dims(input, axis=1)
+
+        ones = tf.ones_like(output)
+        input = tf.multiply(ones, input)
+        print('<GO> inputs: ', input.get_shape())
 
         valid_dists = []
         for steps in range(self.hyps['max_sentence_length']):
 
             output, state = tf.nn.dynamic_rnn(cell=lstmcell, inputs=input, initial_state=state)
+            # print('loop shapes. input', input.get_shape(), 'state', state)
 
             distrib = tf.nn.xw_plus_b(tf.unstack(output, axis=1)[0], W_out, b_out)
             distrib = tf.nn.softmax(distrib)
@@ -162,24 +183,14 @@ class CaptioningNetwork():
 
         self.out_tensor_valid = tf.stack(valid_dists, axis=1)
         self.inferred_sentence = inferred
-            
+        print('Out tensor shape: ', self.out_tensor_valid.get_shape())
+
     def calculate_loss(self, preds, y_pl):
         """
         :param preds: Prediction of the forward pass, as vocabulary distributions. Shape (batch_size, max_sentence_length, vocab_size)
         :param y_pl: True target. Shape (batch_size, sentence_length)
         :return: Likelihood of the prediction (defined in the paper). The  is an element of the graph (Tensor)
         """
-
-        # temp = tf.reshape(y_pl, [self.hyps['batch_size'], self.hyps['max_sentence_length'], 1])
-        #
-        # unstacked_pred = tf.unstack(preds)
-        # unstacked_true = tf.unstack(temp)
-        #
-        # results = [tf.gather_nd(unstacked_pred[i],
-        #                         tf.concat([tf.reshape(tf.range(0, self.hyps['max_sentence_length']), [-1, 1]), unstacked_true[i]], axis=1)) for i in
-        #            range(len(unstacked_pred))]
-        #
-        # results = -tf.log(tf.stack(results))
         #
         temp = tf.one_hot(y_pl, depth=self.vocab.size, axis=-1)
         loss = tf.nn.softmax_cross_entropy_with_logits(labels=temp, logits=preds)
@@ -211,6 +222,8 @@ class CaptioningNetwork():
 
     def add_valid_op(self):
         self.valid_loss = self.calculate_loss(self.out_tensor_valid, self.y_pl)
+
+        # self.valid_loss = self.calculate_loss(self.validation_graph.out_tensor_valid, self.validation_graph.y_pl)
         tf.summary.scalar('valid_loss', self.valid_loss)
 
     def add_train_op(self):
@@ -218,6 +231,7 @@ class CaptioningNetwork():
         Assigns to a class variable the training operator (gradient iteration)
         """
         self.loss = self.calculate_loss(self.out_tensor, self.y_pl)
+        # self.loss = self.calculate_loss(self.training_graph.out_tensor, self.training_graph.y_pl)
         tf.summary.scalar('train_loss', self.loss)
 
         # optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.hyps['sgd_learning_rate'])
@@ -225,12 +239,16 @@ class CaptioningNetwork():
         grads_and_vars = optimizer.compute_gradients(self.loss)
         self.global_step = tf.Variable(0, trainable=False, name='global_step')
         self.train_op = optimizer.apply_gradients(grads_and_vars, global_step=self.global_step)
-        self.learning_rate = optimizer._lr_t
-        tf.summary.scalar('learning_rate', optimizer._lr_t)
+
+        # self.learning_rate = optimizer._lr_t
+        # tf.summary.scalar('learning_rate', optimizer._lr_t)
 
     def feed_forward_test(self, sess, batch):
         feed_dict = self.make_feed_dict(batch)
         fetches = {'output': self.out_tensor}
+
+        # feed_dict = self.make_feed_dict(self.training_graph, batch)
+        # fetches = {'output': self.training_graph.out_tensor}
 
         result = sess.run(fetches=fetches, feed_dict=feed_dict)
         print('Feed forward OK')
@@ -243,12 +261,12 @@ class CaptioningNetwork():
         """
 
         feed_dict = self.make_feed_dict(batch)
+        # feed_dict = self.make_feed_dict(self.training_graph, batch)
         fetches = {'loss': self.loss,
                    'train_op': self.train_op,
                    'summary': self.summaries,
                    'global_step': self.global_step,
-                   'out_sentences': self.out_sentences,
-                   'lr': self.learning_rate
+                   'out_sentences': self.out_sentences
                    }
 
         result = sess.run(fetches=fetches, feed_dict=feed_dict)
@@ -261,25 +279,33 @@ class CaptioningNetwork():
                    'valid_loss': self.valid_loss,
                    'summary': self.summaries
                    }
+        #
+        # fetches = {'inference': self.validation_graph.inferred_sentence,
+        #            'valid_loss': self.valid_loss,
+        #            'summary': self.summaries
+        #            }
 
         feed_dict = self.make_feed_dict(valid_batch)
+        # feed_dict = self.make_feed_dict(self.validation_graph, valid_batch)
 
         result = sess.run(fetches=fetches, feed_dict=feed_dict)
 
         return result
 
-    def predict(self, input):
-        """
 
-        :param input: image to feed-forward
-        :return: The generated caption
-        """
-        ##### WARNING - The graph has to be updated to be working with the inference mode (No target in the feed_dict)
-
-        fetches = [self.out_tensor]
-        feed_dict = {self.X_pl: input}
-
-        with tf.Session() as sess:
-            generated_caption = sess.run(fetches, feed_dict)
-
-        return generated_caption
+    #
+    # def predict(self, input):
+    #     """
+    #
+    #     :param input: image to feed-forward
+    #     :return: The generated caption
+    #     """
+    #     ##### WARNING - The graph has to be updated to be working with the inference mode (No target in the feed_dict)
+    #
+    #     fetches = [self.validation_graph.out_tensor]
+    #     feed_dict = {self.validation_graph.X_pl: input}
+    #
+    #     with tf.Session() as sess:
+    #         generated_caption = sess.run(fetches, feed_dict)
+    #
+    #     return generated_caption
