@@ -6,9 +6,10 @@ import numpy as np
 from keras.preprocessing.sequence import pad_sequences
 from collections import Counter
 import pickle
-import skimage
-import skimage.io
-import skimage.transform
+# import skimage
+# import skimage.io
+# import skimage.transform
+import cv2
 import random
 import json
 import tensornets as nets
@@ -59,7 +60,7 @@ class Batcher():
     
     def load_image(self, path):
         # load image
-        img = skimage.io.imread(path)
+        img = cv2.imread(path)
         img = img / 255.0
         assert (0 <= img).all() and (img <= 1.0).all()
         # print "Original Image Shape: ", img.shape
@@ -70,7 +71,7 @@ class Batcher():
         xx = int((long_edge - img.shape[1]) / 2)
         padded_img[yy: yy + img.shape[0], xx: xx + img.shape[1]] = img
         # resize to 224, 224
-        resized_img = skimage.transform.resize(padded_img, (self.im_width, self.im_height))        
+        resized_img = cv2.resize(padded_img, (self.im_width, self.im_height))        
         return resized_img
 
     def next_train_batch(self, model=None):
