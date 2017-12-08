@@ -65,8 +65,8 @@ def print_training(iteration_id, iteration, batch, vocab):
     train_sentences = np.transpose(train_words)
 
     success_rate = 0
-    print('Grads', iteration['grads'])
-    print('Vars', iteration['vars'])
+    print('Grads', {i: j for i,j in enumerate(iteration['grads'])})
+    print('Vars', {i: j for i,j in enumerate(iteration['vars'])})
     print('Max grad', max(iteration['grads']))
     print('Max var', max(iteration['vars']))
     for id, k in enumerate(train_sentences):
@@ -113,6 +113,8 @@ if __name__ == "__main__":
     ### Temporary test with one iteration
     # Training - to comment while testing the feed forward pass
 
+    variables = {j: i.name for j, i in enumerate(tf.trainable_variables())}
+    json.dump(variables, open('variable_names.json', 'w'))
 
     with sess:
 

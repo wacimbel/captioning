@@ -17,7 +17,7 @@
   "nb_LSTM_cells": 30,
   "embedding_sdv":1,
   "sgd_learning_rate":1,
-  "adam_learning_rate":0.008,
+  "adam_learning_rate":0.02,
   "masking_loss":true,
   "normalize_loss":false,
   "pretrained_embedding":false
