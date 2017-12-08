@@ -3,7 +3,6 @@ import json
 import tensorflow as tf
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 import datetime
 import time
 import tensornets as nets
