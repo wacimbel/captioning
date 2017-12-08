@@ -3,7 +3,6 @@ import json
 import tensorflow as tf
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 import datetime
 import time
 import tensornets as nets
@@ -148,9 +147,9 @@ if __name__ == "__main__":
 
             summary_writer.add_summary(summaries, iteration['global_step'])  # write the summaries
 
-
+            print('Iteration %d - Train loss: ' % i, loss)
             ## Validation
-            if not i % 1:
+            if not i % 10:
 
 
                 print('\n\n###############################################################################################')
@@ -158,5 +157,5 @@ if __name__ == "__main__":
 
                 print_training(i, iteration, train_batch, vocab)
 
-                run_and_print_validation(i, model, batcher, vocab)
+               # run_and_print_validation(i, model, batcher, vocab)
 #
