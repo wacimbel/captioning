@@ -65,14 +65,18 @@ def print_training(iteration_id, iteration, batch, vocab):
     train_sentences = np.transpose(train_words)
 
     success_rate = 0
+    print('Grads', iteration['grads'])
+    print('Vars', iteration['vars'])
+    print('Max grad', max(iteration['grads']))
+    print('Max var', max(iteration['vars']))
     for id, k in enumerate(train_sentences):
         pred = [vocab.get_index_word(j) for j in k]
         true = [vocab.get_index_word(j) for j in batch[1][id]]
 
         mask = len([i for i in true if i != '<PAD>'])
 
-        success_rate += pred[:mask] == true[2:mask+1]
-        print(id, ' '.join(pred))
+        success_rate += pred[:mask] == true[1:mask+1]
+        print(id, ('<GO> '+' '.join(pred)).replace('<PAD>', ''))
         print(id, ' '.join(true))
         # print('\n')
 

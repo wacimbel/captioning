@@ -75,8 +75,8 @@ class CaptioningNetwork():
 
         #We have to remember loading the weights for this layer
         xav_init = tf.contrib.layers.xavier_initializer(uniform=False)
-        # embedding_init = tf.initializers.truncated_normal(0, self.hyps['embedding_sdv'])
         embedding_init = tf.truncated_normal_initializer(0, self.hyps['embedding_sdv'])
+        # embedding_init = tf.random_uniform_initializer(minval=-1.0, maxval=1.0, dtype=tf.float32)
 
         if self.hyps['pretrained_embedding'] == False:
             self.X_embeddings = tf.get_variable('X_embeddings',
@@ -116,8 +116,13 @@ class CaptioningNetwork():
 
         outputs, state = tf.nn.dynamic_rnn(cell=lstmcell,  inputs=inputs, dtype=tf.float32)
 
-        # tf.summary.scalar('LSTM outputs', tf.reduce_sum(tf.square(outputs)))
+        # CNN Input
+        # _, state = lstmcell(cnn_output, (init_state, init_state))
 
+        # Caption input
+        outputs, _ = tf.nn.dynamic_rnn(cell=lstmcell,  inputs=inputs, dtype=tf.float32, initial_state=lstmcell.zero_state(tf.shape(cnn_output)[0], dtype=tf.float32))
+        # outputs, _ = tf.nn.dynamic_rnn(cell=lstmcell,  inputs=caption_embedding, dtype=tf.float32, initial_state=state)
+        print('Training outputs shape: ', outputs.get_shape())
         # outputs : [batchsize, nombre de mots, hidden_dim]
         out_tensor = []
         unstacked_outputs = tf.unstack(outputs, axis=1)
@@ -125,7 +130,7 @@ class CaptioningNetwork():
         W_out = tf.get_variable('W_out', [self.hyps['hidden_dim'], self.vocab.size], initializer=xav_init)
         b_out = tf.get_variable('b_out', [self.vocab.size])
 
-
+        # for output_batch in unstacked_outputs:
         for output_batch in unstacked_outputs[1:]:
             out_tensor.append(tf.nn.xw_plus_b(output_batch, W_out, b_out))
 
@@ -146,7 +151,11 @@ class CaptioningNetwork():
         inferred = []
 
         print('input shape', input.get_shape())
+
         output, state = tf.nn.dynamic_rnn(cell=lstmcell, inputs=input, dtype=tf.float32)
+        # init_state = tf.zeros([tf.shape(input)[0], self.hyps['hidden_dim']])
+
+
 
         print('output shape', output.get_shape())
         print('state shape', state)
@@ -165,7 +174,6 @@ class CaptioningNetwork():
         # input = tf.stack([input for i in range(self.hyps['valid_batch_size'])])
         # input = tf.expand_dims(input, axis=1)
 
-        #ones (batch_size, 1, 100)
         ones = tf.ones_like(output)
         input = tf.multiply(ones, input)
         # input batch_size, 1, 100
@@ -241,7 +249,17 @@ class CaptioningNetwork():
 
         # optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.hyps['sgd_learning_rate'])
         optimizer = tf.train.AdamOptimizer(learning_rate=self.hyps['adam_learning_rate'])
+        # optimizer
         grads_and_vars = optimizer.compute_gradients(self.loss)
+
+
+        capped_gvs = [(tf.clip_by_value(grad, -self.hyps['grad_clip'], self.hyps['grad_clip']), var) for grad, var in grads_and_vars]
+
+        self.grads = [tf.norm(i[0]) for i in grads_and_vars]
+        self.vars = [tf.norm(i[1]) for i in grads_and_vars]
+        # for grad, var in grads_and_vars:
+        #     tf.summary.scalar('grad %s' %var.name, grad)
+        # tf.summary.scalar('grad', grads_and_vars[0])
         self.global_step = tf.Variable(0, trainable=False, name='global_step')
         self.train_op = optimizer.apply_gradients(grads_and_vars, global_step=self.global_step)
 
@@ -271,7 +289,9 @@ class CaptioningNetwork():
                    'train_op': self.train_op,
                    'summary': self.summaries,
                    'global_step': self.global_step,
-                   'out_sentences': self.out_sentences
+                   'out_sentences': self.out_sentences,
+                   'grads': self.grads,
+                   'vars': self.vars
                    }
 
         result = sess.run(fetches=fetches, feed_dict=feed_dict)
