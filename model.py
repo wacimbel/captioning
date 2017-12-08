@@ -77,7 +77,6 @@ class CaptioningNetwork():
         xav_init = tf.contrib.layers.xavier_initializer(uniform=False)
         # embedding_init = tf.initializers.truncated_normal(0, self.hyps['embedding_sdv'])
         embedding_init = tf.truncated_normal_initializer(0, self.hyps['embedding_sdv'])
-        # embedding_init = tf.random_uniform_initializer(minval=-1.0, maxval=1.0)
 
         if self.hyps['pretrained_embedding'] == False:
             self.X_embeddings = tf.get_variable('X_embeddings',
@@ -86,7 +85,7 @@ class CaptioningNetwork():
                                                 initializer=embedding_init)
 
         else:
-            self.X_embeddings = tf.Variable(np.load('./embedding_captioning.npy'), trainable=True, dtype=tf.float32)
+            self.X_embeddings = tf.Variable(np.load('./embedding_captioning.npy'), trainable=False, dtype=tf.float32)
 
         # tf.summary.scalar('Embeddings', tf.reduce_sum(tf.square(self.X_embeddings)))
         self.cnn = nets.Inception3(self.X_pl)
@@ -99,6 +98,8 @@ class CaptioningNetwork():
 
         cnn_output = tf.contrib.layers.fully_connected(CNN_lastlayer, self.hyps['hidden_dim'], scope='cnn_output')
         # cnn_output has shape [batch_size, hidden_size]
+        cnn_output = tf.expand_dims(cnn_output, axis=1)
+        # cnn_output has shape [batch_size, 1, hidden_size]
 
         # tf.summary.scalar('Output cnn after fully connected', tf.reduce_sum(tf.square(cnn_output)))
 
@@ -106,15 +107,14 @@ class CaptioningNetwork():
         # caption_embedding has shape (batch_size, max_sentence_length, embedding_size)
         caption_embedding = self.embedding(self.y_pl)
 
-        inputs = tf.concat([tf.expand_dims(cnn_output, axis=1), caption_embedding], axis=1)
+        inputs = tf.concat([cnn_output, caption_embedding], axis=1)
 
         # CNN_lastlayer : [batch_size, hidden_dim]
         # caption_embedding : [batch_size, nb_LSTM_cells, embedding_size] where embedding_size = hidden_dim
 
-        # lstmcell = tf.contrib.rnn.LSTMCell(self.hyps['hidden_dim'])
-        lstmcell = tf.nn.rnn_cell.LSTMCell(self.hyps['hidden_dim'])
+        lstmcell = tf.contrib.rnn.LSTMCell(self.hyps['hidden_dim'])
 
-        outputs, _ = tf.nn.dynamic_rnn(cell=lstmcell,  inputs=inputs, dtype=tf.float32)
+        outputs, state = tf.nn.dynamic_rnn(cell=lstmcell,  inputs=inputs, dtype=tf.float32)
 
         # tf.summary.scalar('LSTM outputs', tf.reduce_sum(tf.square(outputs)))
 
@@ -134,12 +134,11 @@ class CaptioningNetwork():
         stacked_vocab_dists = tf.stack(vocab_dists, axis=1)
 
         self.out_tensor = stacked_vocab_dists
+
         print(self.out_tensor.get_shape())
         # tf.summary.tensor_summary('distrib', self.out_tensor)
 
         self.out_sentences = [tf.argmax(i, axis=1) for i in vocab_dists]
-
-
 
 
         # Inference / validation part of the graph
@@ -147,21 +146,16 @@ class CaptioningNetwork():
         inferred = []
 
         print('input shape', input.get_shape())
-        state = tf.zeros([tf.shape(input)[0], self.hyps['hidden_dim']])
-
-        output, state = lstmcell(input, (state, state))
-
-        print(lstmcell.state_size)
+        output, state = tf.nn.dynamic_rnn(cell=lstmcell, inputs=input, dtype=tf.float32)
 
         print('output shape', output.get_shape())
         print('state shape', state)
 
-
         # Input the token <GO>
+        # input has dimensions (1, embedding_size)
         input = self.embedding(2)
         input = tf.expand_dims(input, axis=0)
-
-        # input = output
+        # input has dimensions (1, 1, embedding_size)
 
         # Batch size expand (Adding <GO> for all elements of the batch)
         ## The hard challenge here is to imitate the shape of the incoming tensor cnn_output, which is None
@@ -171,15 +165,14 @@ class CaptioningNetwork():
         # input = tf.stack([input for i in range(self.hyps['valid_batch_size'])])
         # input = tf.expand_dims(input, axis=1)
 
-        output = tf.expand_dims(output, axis=1)
+        #ones (batch_size, 1, 100)
         ones = tf.ones_like(output)
         input = tf.multiply(ones, input)
-
-        # tf.summary.scalar('input', tf.shape(input)[0])
+        # input batch_size, 1, 100
         print('<GO> inputs: ', input.get_shape())
 
-
         valid_dists = []
+        # input
         for steps in range(self.hyps['max_sentence_length']):
 
             output, state = tf.nn.dynamic_rnn(cell=lstmcell, inputs=input, initial_state=state)
@@ -188,10 +181,8 @@ class CaptioningNetwork():
             distrib = tf.nn.xw_plus_b(tf.unstack(output, axis=1)[0], W_out, b_out)
             distrib = tf.nn.softmax(distrib)
             valid_dists.append(distrib)
-
             index = tf.argmax(distrib, axis=1)
             inferred.append(index)
-
             input = self.embedding(index)
             input = tf.expand_dims(input, axis=1)
 
@@ -206,8 +197,8 @@ class CaptioningNetwork():
         :return: Likelihood of the prediction (defined in the paper). The  is an element of the graph (Tensor)
         """
         #
-        temp = tf.one_hot(y_pl[:, 1:], depth=self.vocab.size, axis=-1)
-        loss = tf.nn.softmax_cross_entropy_with_logits(labels=temp, logits=preds[:, :-1,:])
+        temp = tf.one_hot(y_pl[:,1:], depth=self.vocab.size, axis=-1)
+        loss = tf.nn.softmax_cross_entropy_with_logits(labels=temp, logits=preds[:,:-1, :])
 
         if self.hyps['masking_loss']:  # With masking
             zero = tf.constant(0, dtype=tf.int32)
@@ -251,7 +242,6 @@ class CaptioningNetwork():
         # optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.hyps['sgd_learning_rate'])
         optimizer = tf.train.AdamOptimizer(learning_rate=self.hyps['adam_learning_rate'])
         grads_and_vars = optimizer.compute_gradients(self.loss)
-        # tf.summary.scalar('grad', grads_and_vars[0])
         self.global_step = tf.Variable(0, trainable=False, name='global_step')
         self.train_op = optimizer.apply_gradients(grads_and_vars, global_step=self.global_step)
 
