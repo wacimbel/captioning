@@ -95,7 +95,7 @@ class Batcher():
         
         for i, image_id in enumerate(batch_ids):
             batch_idx = i % self.batch_size
-            img_name = 'COCO_train2014_000000' + str(image_id) + '.jpg'
+            img_name = 'COCO_train2014_' + format(image_id, '012') + '.jpg'
             imgs[batch_idx, ...] = self.load_image(self.train_path + 'images/' + img_name)
             if model is not None:
                 imgs[batch_idx, ...] = nets.preprocess(model, imgs[batch_idx, ...])
@@ -118,7 +118,7 @@ class Batcher():
 
         for i, image_id in enumerate(batch_ids):
             batch_idx = i % self.valid_batch_size
-            img_name = 'COCO_val2014_000000' + str(image_id) + '.jpg'
+            img_name = 'COCO_val2014_' + format(image_id, '012') + '.jpg'
             imgs[batch_idx, ...] = self.load_image(self.val_path + 'images/' + img_name)
             if model is not None:
                 imgs[batch_idx, ...] = nets.preprocess(model, imgs[batch_idx, ...])    
