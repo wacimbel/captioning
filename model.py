@@ -89,7 +89,7 @@ class CaptioningNetwork():
 
         # tf.summary.scalar('Embeddings', tf.reduce_sum(tf.square(self.X_embeddings)))
         # self.cnn = nets.Inception3(self.X_pl)
-        self.cnn = nets.Inception3(self.X_pl, is_training=True, classes=100)
+        self.cnn = nets.Inception3(self.X_pl, is_training=True, classes=1000)
 
         # tf.summary.scalar('Output cnn', tf.reduce_sum(tf.square(self.cnn)))
 
@@ -97,10 +97,9 @@ class CaptioningNetwork():
         # Shape sortie: [batchsize, 1000]
 
 
-        # cnn_output = tf.contrib.layers.fully_connected(CNN_lastlayer, self.hyps['hidden_dim'], scope='cnn_output')
+        cnn_output = tf.contrib.layers.fully_connected(CNN_lastlayer, self.hyps['hidden_dim'], scope='cnn_output')
         # cnn_output has shape [batch_size, hidden_size]
 
-        cnn_output = CNN_lastlayer
         cnn_output = tf.expand_dims(cnn_output, axis=1)
         # cnn_output has shape [batch_size, 1, hidden_size]
 
@@ -117,7 +116,7 @@ class CaptioningNetwork():
 
         lstmcell = tf.contrib.rnn.LSTMCell(self.hyps['hidden_dim'])
 
-        outputs, state = tf.nn.dynamic_rnn(cell=lstmcell,  inputs=inputs, dtype=tf.float32)
+        # outputs, state = tf.nn.dynamic_rnn(cell=lstmcell,  inputs=inputs, dtype=tf.float32)
 
         # CNN Input
         # _, state = lstmcell(cnn_output, (init_state, init_state))
@@ -137,8 +136,8 @@ class CaptioningNetwork():
         for output_batch in unstacked_outputs[1:]:
             out_tensor.append(tf.nn.xw_plus_b(output_batch, W_out, b_out))
 
-        vocab_dists = [tf.nn.softmax(s) for s in out_tensor]
-
+        # vocab_dists = [tf.nn.softmax(s) for s in out_tensor]
+        vocab_dists = out_tensor
         stacked_vocab_dists = tf.stack(vocab_dists, axis=1)
 
         self.out_tensor = stacked_vocab_dists
@@ -190,7 +189,7 @@ class CaptioningNetwork():
             # print('loop shapes. input', input.get_shape(), 'state', state)
 
             distrib = tf.nn.xw_plus_b(tf.unstack(output, axis=1)[0], W_out, b_out)
-            distrib = tf.nn.softmax(distrib)
+            # distrib = tf.nn.softmax(distrib)
             valid_dists.append(distrib)
             index = tf.argmax(distrib, axis=1)
             inferred.append(index)

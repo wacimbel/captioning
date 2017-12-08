@@ -1,6 +1,5 @@
 {
-
-  "batch_size":4,
+  "batch_size":3,
   "valid_batch_size":2,
   "hidden_dim":100,
   "embedding_size":100,
@@ -17,7 +16,7 @@
   "nb_LSTM_cells": 30,
   "embedding_sdv":1,
   "sgd_learning_rate":1,
-  "adam_learning_rate":1,
+  "adam_learning_rate":0.005,
   "masking_loss":true,
   "normalize_loss":false,
   "pretrained_embedding":false

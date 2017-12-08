@@ -157,5 +157,5 @@ if __name__ == "__main__":
 
                 print_training(i, iteration, train_batch, vocab)
 
-               # run_and_print_validation(i, model, batcher, vocab)
+                run_and_print_validation(i, model, batcher, vocab)
 #
