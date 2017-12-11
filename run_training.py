@@ -8,6 +8,8 @@ import time
 import tensornets as nets
 from model import CaptioningNetwork
 from data import Batcher, Vocab
+import os
+import re
 
 # from tensorflow import word2
 def setup_training(model, train_dir):
@@ -28,7 +30,7 @@ def setup_training(model, train_dir):
 
     summary_writer = sv.summary_writer
 
-    return summary_writer
+    return sv
 
 
 def run_and_print_validation(iteration_id, model, batcher, vocab):
@@ -96,7 +98,6 @@ if __name__ == "__main__":
     tf.set_random_seed(111)
 
     # Setup training
-    sess = tf.Session()
     tf.logging.info('Building graph...')
     model.build_graph()
 
@@ -115,14 +116,23 @@ if __name__ == "__main__":
 
     variables = {j: i.name for j, i in enumerate(tf.trainable_variables())}
     json.dump(variables, open('variable_names.json', 'w'))
+    
+    
+    
+    
+ 
 
-    with sess:
+    with tf.Session() as sess:
 
+        
         nets.pretrained(model.cnn)
         model.add_operators()
+        
         sess.run(tf.global_variables_initializer())
 
-        summary_writer = setup_training(model, train_dir)
+        sv = setup_training(model, train_dir)
+        summary_writer = sv.summary_writer
+        
         print('Ready to feedforward')
 
         # Run training
@@ -130,7 +140,7 @@ if __name__ == "__main__":
 
         # model.feed_forward_test(sess, batcher.next_batch(model.cnn))
         i = 0
-        while batcher.epoch_completed < 10:
+        while i < 100000:
             # while batcher.epoch_completed < config.epochs:
             i += 1
             train_batch = batcher.next_train_batch(model.cnn)
@@ -159,4 +169,19 @@ if __name__ == "__main__":
                 print_training(i, iteration, train_batch, vocab)
 
                 run_and_print_validation(i, model, batcher, vocab)
+                
+            if not i % 100:
+                savename = '/model_iteration_%d_loss_%0.5f.ckpt'%(i, loss)
+    
+                models = [i for i in os.listdir(train_dir) if 'iteration_' in i]
+                losses = [float(re.findall('\_[0-9]+\.[0-9]+', txt)[0][1:]) for txt in models]
+                if len(losses) > 3 :
+                    max_index = np.argmax(losses)
+                    if loss < max(losses):
+                        os.remove(os.path.join(train_dir, models[max_index]))
+                        sv.saver.save(sess, train_dir + savename)
+                else:
+                    sv.saver.save(sess, train_dir + savename)
+ 
+            
 #
