@@ -5,6 +5,7 @@ import tensorflow as tf
 import tensornets as nets
 import numpy as np
 from create_graph import CaptioningGraph
+from nltk.translate.bleu_score import sentence_bleu
 
 class CaptioningNetwork():
     def __init__(self, config, vocab):
@@ -15,6 +16,10 @@ class CaptioningNetwork():
 
         self.hyps = config
         self.vocab = vocab
+        
+        with tf.variable_scope('vocab_tensor'):
+            self.tensor_vocab = tf.Variable([self.vocab.get_index_word(i) for i in range(self.vocab.size)])
+        
         for key, value in self.hyps.items():
             print(key, ":", value)
 
@@ -23,8 +28,8 @@ class CaptioningNetwork():
 
         :return: Creates all the necessary placeholders for the training loop, as class variables
         """
-        self.X_pl = tf.placeholder(tf.float32, shape=[None, self.hyps['im_width'], self.hyps['im_height'], self.hyps['nb_channels']], name='X_input')
-        self.y_pl = tf.placeholder(tf.int32, shape=[None, self.hyps['max_sentence_length']], name='y_target_in')
+        self.X_pl = tf.placeholder(tf.float32, shape=[self.hyps['batch_size'], self.hyps['im_width'], self.hyps['im_height'], self.hyps['nb_channels']], name='X_input')
+        self.y_pl = tf.placeholder(tf.int32, shape=[self.hyps['batch_size'], self.hyps['max_sentence_length']], name='y_target_in')
 
     def make_feed_dict(self, batch: Tuple) -> Dict:
     # def make_feed_dict(self, graph, batch: Tuple) -> Dict:
@@ -191,7 +196,11 @@ class CaptioningNetwork():
             distrib = tf.nn.xw_plus_b(tf.unstack(output, axis=1)[0], W_out, b_out)
             # distrib = tf.nn.softmax(distrib)
             valid_dists.append(distrib)
-            index = tf.argmax(distrib, axis=1)
+            #index = tf.argmax(distrib, axis=1)
+            
+            sample = tf.squeeze(tf.multinomial(distrib, 1))
+
+            index = sample
             inferred.append(index)
             input = self.embedding(index)
             input = tf.expand_dims(input, axis=1)
@@ -199,6 +208,14 @@ class CaptioningNetwork():
         self.out_tensor_valid = tf.stack(valid_dists, axis=1)
         self.inferred_sentence = inferred
         print('Out tensor shape: ', self.out_tensor_valid.get_shape())
+        
+        self.inferred_sentence_as_text = self.convert_to_text(inferred)
+        self.ground_truth_as_text = self.convert_to_text(tf.unstack(self.y_pl, axis=1))
+        tf.summary.text('validation texts', tf.reduce_join([self.inferred_sentence_as_text, self.ground_truth_as_text], axis=1, separator='\n\n'))
+        # tf.summary.text('validation ground truth', self.ground_truth_as_text)
+
+        self.bleu_score(self.inferred_sentence_as_text, self.ground_truth_as_text)
+        
 
     def calculate_loss(self, preds, y_pl):
         """
@@ -257,14 +274,14 @@ class CaptioningNetwork():
 
         # capped_gvs = [(tf.clip_by_value(grad, -self.hyps['grad_clip'], self.hyps['grad_clip']), var) for grad, var in grads_and_vars]
 
-        self.grads = [tf.norm(i[0]) for i in grads_and_vars]
+#         self.grads = [tf.norm(i[0]) for i in grads_and_vars]
 
 
-        self.vars = [tf.norm(i[1]) for i in grads_and_vars]
+#         self.vars = [tf.norm(i[1]) for i in grads_and_vars]
 
-        for i, j in enumerate(self.grads):
-            tf.summary.scalar('Gradient variable %i'%i, j)
-            tf.summary.scalar('Variable %i' % i, self.vars[i])
+#         for i, j in enumerate(self.grads):
+#             tf.summary.scalar('Gradient variable %i'%i, j)
+#             tf.summary.scalar('Variable %i' % i, self.vars[i])
 
         # for grad, var in grads_and_vars:
         #     tf.summary.scalar('grad %s' %var.name, grad)
@@ -298,9 +315,8 @@ class CaptioningNetwork():
                    'train_op': self.train_op,
                    'summary': self.summaries,
                    'global_step': self.global_step,
-                   'out_sentences': self.out_sentences,
-                   'grads': self.grads,
-                   'vars': self.vars
+                   'out_sentences': self.out_sentences
+                
                    }
 
         result = sess.run(fetches=fetches, feed_dict=feed_dict)
@@ -326,7 +342,27 @@ class CaptioningNetwork():
 
         return result
 
+    def convert_to_text(self, sentences):
+        """
 
+        :param sentences: batch of sentences as int ids
+        :return:
+        """
+
+        texts = tf.transpose(tf.gather(self.tensor_vocab, sentences))
+        print(texts.get_shape())
+
+        # texts = tf.concat(texts, axis=1)
+
+        texts = tf.string_join(tf.unstack(texts, axis=1), separator=' ')
+        # texts = tf.reduce_join(texts, axis=1)
+
+        return texts
+
+    def bleu_score(self, true, preds):
+
+        for i, groud_truth in enumerate(tf.unstack(true, axis=0)):
+            tf.summary.scalar('bleu score sentence %d' % i, sentence_bleu([str(groud_truth)], str(preds[i])))
     #
     # def predict(self, input):
     #     """

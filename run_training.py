@@ -66,10 +66,10 @@ def print_training(iteration_id, iteration, batch, vocab):
     train_sentences = np.transpose(train_words)
 
     success_rate = 0
-    print('Grads', {i: j for i,j in enumerate(iteration['grads'])})
-    print('Vars', {i: j for i,j in enumerate(iteration['vars'])})
-    print('Max grad', max(iteration['grads']))
-    print('Max var', max(iteration['vars']))
+#     print('Grads', {i: j for i,j in enumerate(iteration['grads'])})
+#     print('Vars', {i: j for i,j in enumerate(iteration['vars'])})
+#     print('Max grad', max(iteration['grads']))
+#     print('Max var', max(iteration['vars']))
     for id, k in enumerate(train_sentences):
         pred = [vocab.get_index_word(j) for j in k]
         true = [vocab.get_index_word(j) for j in batch[1][id]]

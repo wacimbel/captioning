@@ -1,5 +1,5 @@
 {
-  "batch_size":32,
+  "batch_size":10,
   "valid_batch_size":32,
   "hidden_dim":512,
   "embedding_size":512,
