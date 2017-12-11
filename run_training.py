@@ -84,6 +84,7 @@ def print_training(iteration_id, iteration, batch, vocab):
 if __name__ == "__main__":
 
     config = json.load(open('config.json', 'r'))
+    #data_path = '/dev/shm/coco/'
     data_path = 'coco/'
     train_dir = 'summaries/Caption_training' + datetime.datetime.strftime(datetime.datetime.today(), '%d%m%Y%H%M%S')
 
@@ -129,7 +130,7 @@ if __name__ == "__main__":
 
         # model.feed_forward_test(sess, batcher.next_batch(model.cnn))
         i = 0
-        while i < 1000:
+        while batcher.epoch_completed < 10:
             # while batcher.epoch_completed < config.epochs:
             i += 1
             train_batch = batcher.next_train_batch(model.cnn)

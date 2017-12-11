@@ -1,8 +1,8 @@
 {
-  "batch_size":3,
-  "valid_batch_size":2,
-  "hidden_dim":100,
-  "embedding_size":100,
+  "batch_size":32,
+  "valid_batch_size":32,
+  "hidden_dim":512,
+  "embedding_size":512,
   "max_sentence_length":30,
   "nb_channels":3,
   "epochs":100,
@@ -10,15 +10,15 @@
   "dropout_rate":0.5,
   "grad_clip":1.0,
   "batch_norm":true,
-  "im_width":368,
-  "im_height":368,
+  "im_width":299,
+  "im_height":299,
   "rand_unif_init_mag":0.02,
   "nb_LSTM_cells": 30,
   "embedding_sdv":1,
   "sgd_learning_rate":1,
-  "adam_learning_rate":0.005,
+  "adam_learning_rate":0.001,
   "masking_loss":true,
-  "normalize_loss":false,
+  "normalize_loss":true,
   "pretrained_embedding":false
 
 }

@@ -100,9 +100,9 @@ class Batcher():
             imgs[batch_idx, ...] = self.load_image(self.train_path + 'images/' + img_name)
             if model is not None:
                 imgs[batch_idx, ...] = nets.preprocess(model, imgs[batch_idx, ...])
-            #sentence = self.train_captions.loc[image_id].sample(1)['caption'].values[0]
+            sentence = self.train_captions.loc[image_id].sample(1)['caption'].values[0]
             #TEMP we select necessarily the same caption
-            sentence = self.train_captions.loc[image_id].iloc[0]['caption']
+            #sentence = self.train_captions.loc[image_id].iloc[0]['caption']
             labels[batch_idx, ...] = self.encode_sentence(sentence, self.vocab)
         
         self.current_idx = next_idx
@@ -123,7 +123,8 @@ class Batcher():
             imgs[batch_idx, ...] = self.load_image(self.val_path + 'images/' + img_name)
             if model is not None:
                 imgs[batch_idx, ...] = nets.preprocess(model, imgs[batch_idx, ...])    
-            sentences = self.val_captions.loc[image_id].iloc[0]['caption']
+            #sentences = self.val_captions.loc[image_id].iloc[0]['caption']
+            sentences = self.val_captions.loc[image_id].sample(1)['caption'].values[0]
             labels[batch_idx, ...] = self.encode_sentence(sentences, self.vocab)
 
         return imgs, labels
