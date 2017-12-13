@@ -7,6 +7,8 @@ import numpy as np
 from create_graph import CaptioningGraph
 from nltk.translate.bleu_score import sentence_bleu
 
+from tensorflow.contrib import slim
+
 class CaptioningNetwork():
     def __init__(self, config, vocab):
         """
@@ -79,15 +81,16 @@ class CaptioningNetwork():
         """
 
         #We have to remember loading the weights for this layer
-        xav_init = tf.contrib.layers.xavier_initializer(uniform=False)
-        embedding_init = tf.truncated_normal_initializer(0, self.hyps['embedding_sdv'])
+        #xav_init = tf.contrib.layers.xavier_initializer(uniform=False)
+        #embedding_init = tf.truncated_normal_initializer(0, self.hyps['embedding_sdv'])
         # embedding_init = tf.random_uniform_initializer(minval=-1.0, maxval=1.0, dtype=tf.float32)
+        initializer = tf.random_uniform_initializer(minval=-0.08, maxval=0.08, dtype=tf.float32)
 
         if self.hyps['pretrained_embedding'] == False:
             self.X_embeddings = tf.get_variable('X_embeddings',
                                                 shape=[self.vocab.size, self.hyps['embedding_size']],
                                                 dtype=tf.float32,
-                                                initializer=embedding_init)
+                                                initializer=initializer)
 
         else:
             self.X_embeddings = tf.Variable(np.load('./embedding_captioning.npy'), trainable=False, dtype=tf.float32)
@@ -102,7 +105,7 @@ class CaptioningNetwork():
         # Shape sortie: [batchsize, 1000]
 
 
-        cnn_output = tf.contrib.layers.fully_connected(CNN_lastlayer, self.hyps['hidden_dim'], scope='cnn_output')
+        cnn_output = tf.contrib.layers.fully_connected(CNN_lastlayer, self.hyps['hidden_dim'], scope='cnn_output', weights_initializer=initializer)
         # cnn_output has shape [batch_size, hidden_size]
 
         cnn_output = tf.expand_dims(cnn_output, axis=1)
@@ -134,7 +137,7 @@ class CaptioningNetwork():
         out_tensor = []
         unstacked_outputs = tf.unstack(outputs, axis=1)
 
-        W_out = tf.get_variable('W_out', [self.hyps['hidden_dim'], self.vocab.size], initializer=xav_init)
+        W_out = tf.get_variable('W_out', [self.hyps['hidden_dim'], self.vocab.size], initializer=initializer)
         b_out = tf.get_variable('b_out', [self.vocab.size])
 
         # for output_batch in unstacked_outputs:
@@ -216,7 +219,22 @@ class CaptioningNetwork():
 
         self.bleu_score(self.inferred_sentence_as_text, self.ground_truth_as_text)
         
+        for var in tf.trainable_variables():
+            if 'vocab_tensor' not in var.name:
+                tf.summary.histogram("parameters/" + var.op.name, var)
+        
+    
+#     def make_gradient_multipliers(self):
+#         all_variables = tf.trainable_variables()
+#         gradient_multipliers = {}
+#         for var in all_variables:
+#             if 'inception' in var.name:
+#                 gradient_multipliers[var.name] = 0
+#             else:
+#                 gradient_multipliers[var.name] = 1
+#         return gradient_multipliers
 
+    
     def calculate_loss(self, preds, y_pl):
         """
         :param preds: Prediction of the forward pass, as vocabulary distributions. Shape (batch_size, max_sentence_length, vocab_size)
@@ -265,7 +283,8 @@ class CaptioningNetwork():
         self.loss = self.calculate_loss(self.out_tensor, self.y_pl)
         # self.loss = self.calculate_loss(self.training_graph.out_tensor, self.training_graph.y_pl)
         tf.summary.scalar('train_loss', self.loss)
-
+        
+#         gradient_multipliers = self.make_gradient_multipliers()
         # optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.hyps['sgd_learning_rate'])
         optimizer = tf.train.AdamOptimizer(learning_rate=self.hyps['adam_learning_rate'])
         # optimizer
@@ -288,6 +307,8 @@ class CaptioningNetwork():
         # tf.summary.scalar('grad', grads_and_vars[0])
         self.global_step = tf.Variable(0, trainable=False, name='global_step')
         self.train_op = optimizer.apply_gradients(grads_and_vars, global_step=self.global_step)
+        
+#         self.train_op = slim.learning.create_train_op(self.loss,optimizer, gradient_multipliers=gradient_multipliers)
 
         # self.learning_rate = optimizer._lr_t
         # tf.summary.scalar('learning_rate', optimizer._lr_t)

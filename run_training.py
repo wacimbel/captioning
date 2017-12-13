@@ -86,8 +86,8 @@ def print_training(iteration_id, iteration, batch, vocab):
 if __name__ == "__main__":
 
     config = json.load(open('config.json', 'r'))
-    #data_path = '/dev/shm/coco/'
-    data_path = 'coco/'
+    data_path = '/dev/shm/coco/'
+    #data_path = 'coco/'
     train_dir = 'summaries/Caption_training' + datetime.datetime.strftime(datetime.datetime.today(), '%d%m%Y%H%M%S')
 
     vocab = Vocab('vocab')
